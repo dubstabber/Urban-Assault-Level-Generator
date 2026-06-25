@@ -14,6 +14,12 @@ Compatibility policy:
 - `generator1` defaults to improved playable output. Use `--strict-parity` to disable the improved tileset filtering path where supported.
 - `generator2` follows the PHP legacy `SET_LIST` terrain allowlists instead of the broader shared tileset compatibility table.
 
+## Requirements
+
+- Python 3.11 or newer.
+- No third-party Python packages are required for normal CLI or GUI use.
+- The GUI uses Python's standard `tkinter` module. Windows and python.org macOS installers usually include it. On Linux, install your distribution's Tk package if needed, for example `python3-tk` on Debian/Ubuntu.
+
 ## Usage
 
 ```powershell
