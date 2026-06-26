@@ -125,6 +125,22 @@ CATEGORY_ENERGY_PARAMS: dict[int, dict[Any, Any]] = {
     },
 }
 
+TECH_UPGRADE_BUILDING_TYP_BY_ID = {
+    60: 106,
+    61: 113,
+    4: 100,
+    7: 73,
+    15: 104,
+    51: 101,
+    50: 102,
+    16: 103,
+    65: 110,
+}
+TECH_UPGRADE_BUILDING_IDS = tuple(TECH_UPGRADE_BUILDING_TYP_BY_ID)
+TECH_UPGRADE_BUILDING_TILESETS = {
+    60: {5},
+}
+
 
 @dataclass
 class Generator1CustomOptions:
@@ -1146,10 +1162,15 @@ class Generator1:
 
     def _write_tech_gem(self, writer: LDFWriter, state: _State, x: int, y: int) -> None:
         family = state.rng.rand_mod(4)
+        building = state.rng.choice(self._tech_upgrade_building_ids(state))
+        state.set("blg", x, y, building)
+        state.set("typ", x, y, TECH_UPGRADE_BUILDING_TYP_BY_ID[building])
+        if state.get("own", x, y) == 0:
+            state.set("own", x, y, state.player_faction)
         writer.line("begin_gem")
         writer.property("sec_x", x)
         writer.property("sec_y", y)
-        writer.property("building", state.rng.choice([4, 7, 15, 16, 50, 51, 61, 65]))
+        writer.property("building", building)
         writer.property("type", 1)
         writer.line("begin_action")
         if family == 0:
@@ -1172,6 +1193,14 @@ class Generator1:
         writer.property("mb_status", "unknown")
         writer.end_block()
         writer.line("")
+
+    @staticmethod
+    def _tech_upgrade_building_ids(state: _State) -> tuple[int, ...]:
+        return tuple(
+            building
+            for building in TECH_UPGRADE_BUILDING_IDS
+            if state.tileset in TECH_UPGRADE_BUILDING_TILESETS.get(building, {state.tileset})
+        )
 
     def _choose_enabled_player_vehicle(self, state: _State) -> int:
         enabled = [

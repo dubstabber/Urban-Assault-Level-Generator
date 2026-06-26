@@ -40,7 +40,12 @@ from ualg.data import (
     ua_faction_units,
     ua_mission_briefing_maps,
 )
-from ualg.generator1 import Generator1, Generator1CustomOptions
+from ualg.generator1 import (
+    Generator1,
+    Generator1CustomOptions,
+    TECH_UPGRADE_BUILDING_TILESETS,
+    TECH_UPGRADE_BUILDING_TYP_BY_ID,
+)
 from ualg.generator2 import Generator2
 from ualg.ldf import parse_maps
 from ualg.rng import MSVCRTRandom
@@ -293,6 +298,28 @@ class CoreTests(unittest.TestCase):
         for keys in item_keys:
             for x, y in keys:
                 self.assertIn(typ[y][x], {TYP_GATE_CLOSED_1, TYP_GATE_CLOSED_2})
+
+    def test_generator1_tech_upgrade_buildings_match_maps(self) -> None:
+        seen_buildings: set[int] = set()
+        for seed in range(1, 12):
+            level = Generator1().generate_single(seed=seed, difficulty=7, skill=6)
+            maps = parse_maps(level.text)
+            typ = maps["typ_map"][2]
+            blg = maps["blg_map"][2]
+            own = maps["own_map"][2]
+            for block in self._blocks(level.text, "begin_gem"):
+                x = int(self._property_values(block, "sec_x")[0])
+                y = int(self._property_values(block, "sec_y")[0])
+                building = int(self._property_values(block, "building")[0])
+                seen_buildings.add(building)
+
+                self.assertEqual(blg[y][x], building)
+                self.assertEqual(typ[y][x], TECH_UPGRADE_BUILDING_TYP_BY_ID[building])
+                self.assertNotEqual(own[y][x], 0)
+                if building in TECH_UPGRADE_BUILDING_TILESETS:
+                    self.assertIn(level.tileset, TECH_UPGRADE_BUILDING_TILESETS[building])
+
+        self.assertEqual(seen_buildings, set(TECH_UPGRADE_BUILDING_TYP_BY_ID))
 
     def test_generator2_single_structure_and_determinism(self) -> None:
         gen = Generator2()
