@@ -137,6 +137,12 @@ TECH_UPGRADE_BUILDING_TYP_BY_ID = {
     65: 110,
 }
 TECH_UPGRADE_BUILDING_IDS = tuple(TECH_UPGRADE_BUILDING_TYP_BY_ID)
+TECH_UPGRADE_BUILDING_IDS_BY_TYPE = {
+    1: (15, 51, 60, 61),
+    2: (50, 51),
+    3: (4, 7, 65),
+    4: (16,),
+}
 TECH_UPGRADE_BUILDING_TILESETS = {
     60: {5},
 }
@@ -1162,43 +1168,52 @@ class Generator1:
 
     def _write_tech_gem(self, writer: LDFWriter, state: _State, x: int, y: int) -> None:
         family = state.rng.rand_mod(4)
-        building = state.rng.choice(self._tech_upgrade_building_ids(state))
+        upgrade_type = (2, 1, 3, 4)[family]
+        building = state.rng.choice(self._tech_upgrade_building_ids(state, upgrade_type))
         state.set("blg", x, y, building)
         state.set("typ", x, y, TECH_UPGRADE_BUILDING_TYP_BY_ID[building])
-        if state.get("own", x, y) == 0:
-            state.set("own", x, y, state.player_faction)
+        if state.get("own", x, y) == state.player_faction:
+            state.set("own", x, y, FACTION_TUTOR)
         writer.line("begin_gem")
         writer.property("sec_x", x)
         writer.property("sec_y", y)
         writer.property("building", building)
-        writer.property("type", 1)
+        writer.property("type", upgrade_type)
         writer.line("begin_action")
         if family == 0:
             vehicle = self._choose_enabled_player_vehicle(state)
-            writer.property("modify_vehicle", vehicle)
-            writer.property("add_energy", 100 + state.rng.rand_mod(401))
+            self._write_tech_action(writer, "modify_vehicle", vehicle, {
+                "add_energy": 100 + state.rng.rand_mod(401),
+                "add_shield": 1 + state.rng.rand_mod(5),
+            })
         elif family == 1:
             vehicle = self._choose_enabled_player_vehicle(state)
-            writer.property("modify_weapon", vehicle)
-            writer.property("num_weapons", 1 + state.rng.rand_mod(3))
+            self._write_tech_action(writer, "modify_weapon", vehicle, {
+                "add_energy": 100 + state.rng.rand_mod(901),
+            })
         elif family == 2:
             vehicle = self._unlock_next_vehicle(state)
-            writer.property("modify_vehicle", vehicle)
-            writer.property("enable", state.player_faction)
+            self._write_tech_action(writer, "modify_vehicle", vehicle, {"enable": state.player_faction})
         else:
-            building = self._unlock_next_building(state)
-            writer.property("modify_building", building)
-            writer.property("enable", state.player_faction)
+            unlocked_building = self._unlock_next_building(state)
+            self._write_tech_action(writer, "modify_building", unlocked_building, {"enable": state.player_faction})
         writer.line("end_action")
         writer.property("mb_status", "unknown")
         writer.end_block()
         writer.line("")
 
     @staticmethod
-    def _tech_upgrade_building_ids(state: _State) -> tuple[int, ...]:
+    def _write_tech_action(writer: LDFWriter, command: str, target: int, properties: dict[str, int]) -> None:
+        writer.line(f"\t{command} {target}")
+        for key, value in properties.items():
+            writer.property(key, value)
+        writer.line("\tend")
+
+    @staticmethod
+    def _tech_upgrade_building_ids(state: _State, upgrade_type: int) -> tuple[int, ...]:
         return tuple(
             building
-            for building in TECH_UPGRADE_BUILDING_IDS
+            for building in TECH_UPGRADE_BUILDING_IDS_BY_TYPE[upgrade_type]
             if state.tileset in TECH_UPGRADE_BUILDING_TILESETS.get(building, {state.tileset})
         )
 

@@ -43,6 +43,7 @@ from ualg.data import (
 from ualg.generator1 import (
     Generator1,
     Generator1CustomOptions,
+    TECH_UPGRADE_BUILDING_IDS_BY_TYPE,
     TECH_UPGRADE_BUILDING_TILESETS,
     TECH_UPGRADE_BUILDING_TYP_BY_ID,
 )
@@ -301,25 +302,61 @@ class CoreTests(unittest.TestCase):
 
     def test_generator1_tech_upgrade_buildings_match_maps(self) -> None:
         seen_buildings: set[int] = set()
-        for seed in range(1, 12):
+        expected_command_by_type = {
+            1: "modify_weapon",
+            2: "modify_vehicle",
+            3: "modify_vehicle",
+            4: "modify_building",
+        }
+        seen_reassigned_owner = False
+        for seed in range(1, 15):
             level = Generator1().generate_single(seed=seed, difficulty=7, skill=6)
             maps = parse_maps(level.text)
             typ = maps["typ_map"][2]
             blg = maps["blg_map"][2]
             own = maps["own_map"][2]
-            for block in self._blocks(level.text, "begin_gem"):
+            self.assertNotRegex(level.text, r"modify_(vehicle|weapon|building)\s*=")
+            for block in self._gem_blocks(level.text):
                 x = int(self._property_values(block, "sec_x")[0])
                 y = int(self._property_values(block, "sec_y")[0])
                 building = int(self._property_values(block, "building")[0])
+                upgrade_type = int(self._property_values(block, "type")[0])
+                stripped_lines = [line.strip() for line in block]
+                action_commands = [
+                    line.split()[0]
+                    for line in stripped_lines
+                    if line.startswith(("modify_vehicle", "modify_weapon", "modify_building"))
+                ]
+                action_index = next(i for i, line in enumerate(stripped_lines) if line.startswith("modify_"))
+                end_action_index = stripped_lines.index("end_action")
                 seen_buildings.add(building)
 
+                self.assertIn(building, TECH_UPGRADE_BUILDING_IDS_BY_TYPE[upgrade_type])
+                self.assertEqual(action_commands, [expected_command_by_type[upgrade_type]])
+                self.assertIn("end", stripped_lines[action_index + 1:end_action_index])
+                self.assertEqual(stripped_lines[-1], "end")
                 self.assertEqual(blg[y][x], building)
                 self.assertEqual(typ[y][x], TECH_UPGRADE_BUILDING_TYP_BY_ID[building])
-                self.assertNotEqual(own[y][x], 0)
+                self.assertNotEqual(own[y][x], 1)
+                seen_reassigned_owner = seen_reassigned_owner or own[y][x] == 7
                 if building in TECH_UPGRADE_BUILDING_TILESETS:
                     self.assertIn(level.tileset, TECH_UPGRADE_BUILDING_TILESETS[building])
 
         self.assertEqual(seen_buildings, set(TECH_UPGRADE_BUILDING_TYP_BY_ID))
+        self.assertTrue(seen_reassigned_owner)
+
+    def test_generator1_metropolis_dawn_tech_upgrades_are_not_player_owned(self) -> None:
+        for profile, player_owner in (("md-ghorkov", 6), ("md-taerkasten", 4)):
+            campaign = Generator1().generate_campaign(seed=1, campaign_profile=profile)
+            seen_reassigned_owner = False
+            for level in campaign.levels:
+                own = parse_maps(level.text)["own_map"][2]
+                for block in self._gem_blocks(level.text):
+                    x = int(self._property_values(block, "sec_x")[0])
+                    y = int(self._property_values(block, "sec_y")[0])
+                    self.assertNotEqual(own[y][x], player_owner)
+                    seen_reassigned_owner = seen_reassigned_owner or own[y][x] == 7
+            self.assertTrue(seen_reassigned_owner, profile)
 
     def test_generator2_single_structure_and_determinism(self) -> None:
         gen = Generator2()
@@ -537,6 +574,31 @@ class CoreTests(unittest.TestCase):
                 continue
             if in_block:
                 current.append(line)
+        return blocks
+
+    @staticmethod
+    def _gem_blocks(text: str) -> list[list[str]]:
+        blocks: list[list[str]] = []
+        current: list[str] = []
+        in_block = False
+        in_action = False
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped == "begin_gem":
+                in_block = True
+                in_action = False
+                current = []
+                continue
+            if not in_block:
+                continue
+            current.append(line)
+            if stripped == "begin_action":
+                in_action = True
+            elif stripped == "end_action":
+                in_action = False
+            elif stripped == "end" and not in_action:
+                blocks.append(current)
+                in_block = False
         return blocks
 
     @staticmethod
