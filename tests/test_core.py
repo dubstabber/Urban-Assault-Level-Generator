@@ -53,6 +53,7 @@ from ualg.generator1 import (
     TECH_UPGRADE_BUILDING_TYP_BY_ID,
 )
 from ualg.generator2 import Generator2
+from ualg.gen2.context import _Level as Generator2Level
 from ualg.ldf import parse_maps
 from ualg.rng import MSVCRTRandom
 
@@ -446,6 +447,30 @@ class CoreTests(unittest.TestCase):
                     if blg[y][x] or typ[y][x] in {TYP_GATE_CLOSED_1, TYP_GATE_CLOSED_2}:
                         continue
                     self.assertIn(typ[y][x], allowed)
+
+    def test_generator2_height_map_uses_y_coordinate_range(self) -> None:
+        class TrackingGenerator(Generator2):
+            def __init__(self) -> None:
+                self.random_x_calls = 0
+                self.random_y_calls = 0
+
+            def _random_x(self, level) -> int:
+                self.random_x_calls += 1
+                return 1
+
+            def _random_y(self, level) -> int:
+                self.random_y_calls += 1
+                return 1
+
+        generator = TrackingGenerator()
+        level = Generator2Level(level_id=1, rng=MSVCRTRandom(123), seed=123)
+        level.width = 12
+        level.height = 6
+
+        generator._make_map(level, "hgt")
+
+        self.assertGreater(generator.random_y_calls, 0)
+        self.assertEqual(generator.random_x_calls, generator.random_y_calls)
 
     def test_generator2_special_cells_match_maps(self) -> None:
         for seed in range(1, 25):

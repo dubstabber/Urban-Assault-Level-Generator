@@ -1,10 +1,8 @@
-"""Public Generator1 API."""
+"""Internal Generator1 implementation package."""
 
-from __future__ import annotations
-
-from .gen1.context import Generator1CustomOptions, _State
-from .gen1.service import Generator1
-from .gen1.tables import (
+from .context import Generator1CustomOptions
+from .service import Generator1
+from .tables import (
     CATEGORY_DIM_RANGES,
     CATEGORY_ENERGY_PARAMS,
     TECH_UPGRADE_BUILDING_IDS,
@@ -22,5 +20,4 @@ __all__ = [
     "TECH_UPGRADE_BUILDING_IDS_BY_TYPE",
     "TECH_UPGRADE_BUILDING_TILESETS",
     "TECH_UPGRADE_BUILDING_TYP_BY_ID",
-    "_State",
 ]
