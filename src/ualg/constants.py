@@ -14,6 +14,13 @@ from .data import (
     ua_level_ids,
     ua_unit_labels,
 )
+from .campaign_profiles import (
+    GENERATOR2_FACTION_CODES_BY_ID,
+    GENERATOR2_FACTION_IDS,
+    default_profile_registry,
+)
+
+_PROFILE_REGISTRY = default_profile_registry()
 
 TYP_MAP_INTERIOR_LOOKUP = [
     0x00, 0x01, 0x02, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
@@ -66,84 +73,28 @@ FACTION_NAMES = {
     FACTION_TUTOR: "Tutor",
 }
 
-GENERATOR1_CAMPAIGN_FILENAMES = [
-    "l2525.ldf", "l2626.ldf", "l9898.ldf",
-    "l0101.ldf", "l0202.ldf", "l0303.ldf", "l0404.ldf", "l0505.ldf",
-    "l1010.ldf", "l1111.ldf", "l1212.ldf",
-    "l2020.ldf", "l2121.ldf", "l2222.ldf", "l2323.ldf",
-    "l3030.ldf", "l3131.ldf", "l3232.ldf", "l3333.ldf", "l3434.ldf",
-    "l4040.ldf", "l4141.ldf", "l4242.ldf", "l4343.ldf", "l4444.ldf",
-    "l5050.ldf", "l5151.ldf", "l5252.ldf", "l5353.ldf", "l5454.ldf",
-    "l6060.ldf", "l6161.ldf", "l6262.ldf", "l6363.ldf", "l6464.ldf",
-    "l6666.ldf",
-    "l7070.ldf", "l7171.ldf", "l7272.ldf", "l7373.ldf", "l7474.ldf", "l7575.ldf",
-    "l1515.ldf", "l9999.ldf",
-]
-
+GENERATOR1_CAMPAIGN_PROFILES = _PROFILE_REGISTRY.names("generator1")
+GENERATOR1_CAMPAIGN_FILENAMES = list(_PROFILE_REGISTRY.get("generator1", "original").filenames)
 GENERATOR1_MD_CAMPAIGN_LEVEL_IDS = ua_level_ids(UA_METROPOLIS_DAWN_PROFILE)
 GENERATOR1_MD_CAMPAIGN_FILENAMES = [f"L{level_id:02d}{level_id:02d}.ldf" for level_id in GENERATOR1_MD_CAMPAIGN_LEVEL_IDS]
-GENERATOR1_CAMPAIGN_PROFILES = ("original", "md-ghorkov", "md-taerkasten")
-GENERATOR1_MD_GHORKOV_LEVEL_IDS = [7, 14, 17, 19, 28, 35, 37, 39, 46, 48, 56, 58, 67, 69, 77, 79]
-GENERATOR1_MD_TAERKASTEN_LEVEL_IDS = [6, 8, 13, 16, 18, 29, 36, 38, 45, 47, 55, 57, 65, 68, 78]
+GENERATOR1_MD_GHORKOV_LEVEL_IDS = list(_PROFILE_REGISTRY.get("generator1", "md-ghorkov").level_ids)
+GENERATOR1_MD_TAERKASTEN_LEVEL_IDS = list(_PROFILE_REGISTRY.get("generator1", "md-taerkasten").level_ids)
 GENERATOR1_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE = {
-    "md-ghorkov": GENERATOR1_MD_GHORKOV_LEVEL_IDS,
-    "md-taerkasten": GENERATOR1_MD_TAERKASTEN_LEVEL_IDS,
+    profile: list(_PROFILE_REGISTRY.get("generator1", profile).level_ids)
+    for profile in GENERATOR1_CAMPAIGN_PROFILES
+    if profile.startswith("md-")
 }
 GENERATOR1_MD_CAMPAIGN_TARGETS_BY_PROFILE = {
-    "md-ghorkov": {
-        7: [14],
-        14: [17, 19],
-        17: [28],
-        19: [35],
-        28: [37, 39],
-        35: [46],
-        37: [48],
-        39: [56],
-        46: [58, 67],
-        48: [69],
-        56: [69],
-        58: [77],
-        67: [77],
-        69: [79],
-        77: [79],
-        79: [7],
-    },
-    "md-taerkasten": {
-        6: [13, 16],
-        8: [45],
-        13: [18],
-        16: [8, 29],
-        18: [36, 38],
-        29: [45],
-        36: [47],
-        38: [55, 57],
-        45: [55, 57],
-        47: [65, 68],
-        55: [68],
-        57: [68],
-        65: [78],
-        68: [78],
-        78: [6],
-    },
+    profile: {
+        level_id: list(targets)
+        for level_id, targets in _PROFILE_REGISTRY.get("generator1", profile).targets_by_level.items()
+    }
+    for profile in GENERATOR1_CAMPAIGN_PROFILES
+    if profile.startswith("md-")
 }
-GENERATOR1_MD_GHORKOV_PLAYER_ROBO_BY_LEVEL = {
-    7: 176,
-    14: 176,
-    17: 176,
-    19: 176,
-    28: 176,
-    35: 176,
-    37: 177,
-    39: 177,
-    46: 177,
-    48: 177,
-    56: 177,
-    58: 177,
-    67: 177,
-    69: 177,
-    77: 177,
-    79: 177,
-}
+GENERATOR1_MD_GHORKOV_PLAYER_ROBO_BY_LEVEL = dict(
+    _PROFILE_REGISTRY.get("generator1", "md-ghorkov").player_robo_by_level
+)
 
 
 def _dedupe(values: list[int]) -> list[int]:
@@ -239,36 +190,28 @@ SKY_OPTIONS = [
     "x2.base", "x4.base", "x7.base", "X9.bas", "xb.base", "xc.base",
 ]
 
+GENERATOR2_CAMPAIGN_PROFILES = _PROFILE_REGISTRY.names("generator2")
 GENERATOR2_LEVELS = {
-    1: [2, 3], 2: [4], 3: [5], 4: [10], 5: [11, 12],
-    10: [20], 11: [21], 12: [22, 23], 15: [], 20: [30, 34],
-    21: [31], 22: [32], 23: [33], 25: [], 26: [], 30: [40],
-    31: [41], 32: [42], 33: [43], 34: [40, 44], 40: [50, 51],
-    41: [52], 42: [53], 43: [54], 44: [50], 50: [60], 51: [66],
-    52: [61, 62], 53: [63], 54: [64], 60: [70], 61: [75],
-    62: [72], 63: [73], 64: [74], 66: [71], 70: [15], 71: [15],
-    72: [15], 73: [15], 74: [15], 75: [15],
+    level_id: list(targets)
+    for level_id, targets in _PROFILE_REGISTRY.get("generator2", "original").targets_by_level.items()
 }
-
-GENERATOR2_CAMPAIGN_LEVEL_IDS = [
-    1, 2, 3, 4, 5, 10, 11, 12, 15, 20, 21, 22, 23, 25, 26,
-    30, 31, 32, 33, 34, 40, 41, 42, 43, 44, 50, 51, 52, 53, 54,
-    60, 61, 62, 63, 64, 66, 70, 71, 72, 73, 74, 75,
-]
-GENERATOR2_CAMPAIGN_PROFILES = ("original", "md-ghorkov", "md-taerkasten")
+GENERATOR2_CAMPAIGN_LEVEL_IDS = list(_PROFILE_REGISTRY.get("generator2", "original").level_ids)
 GENERATOR2_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE = {
-    profile: list(level_ids)
-    for profile, level_ids in GENERATOR1_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE.items()
+    profile: list(_PROFILE_REGISTRY.get("generator2", profile).level_ids)
+    for profile in GENERATOR2_CAMPAIGN_PROFILES
+    if profile.startswith("md-")
 }
 GENERATOR2_MD_CAMPAIGN_TARGETS_BY_PROFILE = {
-    profile: {level_id: list(targets) for level_id, targets in target_graph.items()}
-    for profile, target_graph in GENERATOR1_MD_CAMPAIGN_TARGETS_BY_PROFILE.items()
+    profile: {
+        level_id: list(targets)
+        for level_id, targets in _PROFILE_REGISTRY.get("generator2", profile).targets_by_level.items()
+    }
+    for profile in GENERATOR2_CAMPAIGN_PROFILES
+    if profile.startswith("md-")
 }
 
-GENERATOR2_FACTIONS = ["sul", "myk", "tae", "bla", "gho"]
-GENERATOR2_FACTION_IDS = {"res": 1, "sul": 2, "myk": 3, "tae": 4, "bla": 5, "gho": 6}
-GENERATOR2_FACTION_CODES_BY_ID = {faction_id: faction for faction, faction_id in GENERATOR2_FACTION_IDS.items()}
-GENERATOR2_HOST_VEHICLES = {"sul": 61, "myk": 58, "tae": 60, "bla": 62}
+GENERATOR2_FACTIONS = list(_PROFILE_REGISTRY.get("generator2", "original").enemy_factions)
+GENERATOR2_HOST_VEHICLES = dict(_PROFILE_REGISTRY.get("generator2", "original").roster.host_vehicle_by_faction)
 GENERATOR2_SET_LIST = {
     1: [
         0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17, 18, 19,
@@ -342,38 +285,24 @@ GENERATOR2_SET_LIST = {
     ],
 }
 GENERATOR2_VEHICLES = {
-    "res": [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16],
-    "sul": [71, 72, 73, 74],
-    "myk": [63, 64, 65, 66, 67, 68, 69, 70],
-    "tae": [8, 32, 33, 34, 35, 36, 37, 38, 131],
-    "gho": [22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 130],
+    faction: list(vehicles)
+    for faction, vehicles in _PROFILE_REGISTRY.get("generator2", "original").roster.vehicles_by_faction.items()
 }
-GENERATOR2_VEHICLES["bla"] = (
-    GENERATOR2_VEHICLES["res"] + GENERATOR2_VEHICLES["sul"] + GENERATOR2_VEHICLES["myk"]
-    + GENERATOR2_VEHICLES["tae"] + GENERATOR2_VEHICLES["gho"]
-)
 GENERATOR2_BUILDINGS = {
-    "res": [11, 63, 2, 28, 3],
-    "sul": [10],
-    "myk": [10, 13, 72],
-    "tae": [17, 31, 53, 73],
-    "bla": [18, 1, 54, 64],
-    "gho": [30, 52, 12, 71],
+    faction: list(buildings)
+    for faction, buildings in _PROFILE_REGISTRY.get("generator2", "original").roster.buildings_by_faction.items()
 }
 GENERATOR2_MD_VEHICLES = {
-    GENERATOR2_FACTION_CODES_BY_ID[faction]: list(vehicles)
-    for faction, vehicles in METROPOLIS_DAWN_VEHICLES_BY_FACTION.items()
-    if faction in GENERATOR2_FACTION_CODES_BY_ID
+    faction: list(vehicles)
+    for faction, vehicles in _PROFILE_REGISTRY.get("generator2", "md-ghorkov").roster.vehicles_by_faction.items()
 }
 GENERATOR2_MD_BUILDINGS = {
-    GENERATOR2_FACTION_CODES_BY_ID[faction]: list(buildings)
-    for faction, buildings in METROPOLIS_DAWN_BUILDINGS_BY_FACTION.items()
-    if faction in GENERATOR2_FACTION_CODES_BY_ID
+    faction: list(buildings)
+    for faction, buildings in _PROFILE_REGISTRY.get("generator2", "md-ghorkov").roster.buildings_by_faction.items()
 }
 GENERATOR2_MD_PLAYER_ROBOS = {
-    GENERATOR2_FACTION_CODES_BY_ID[faction]: list(robos)
-    for faction, robos in METROPOLIS_DAWN_PLAYER_ROBOS_BY_FACTION.items()
-    if faction in GENERATOR2_FACTION_CODES_BY_ID
+    faction: list(robos)
+    for faction, robos in _PROFILE_REGISTRY.get("generator2", "md-ghorkov").roster.player_robo_ids_by_faction.items()
 }
 GENERATOR2_SCOUT_VEHICLES = {9, 74, 67, 35, 29}
 GENERATOR2_SKIES = [

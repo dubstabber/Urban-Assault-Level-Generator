@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "generators": {
+    "generator1": {
+      "original": {
+        "data_profile": "original",
+        "roster_profile": "original",
+        "mission_map_profile": null,
+        "mission_briefing_default": "MB_02.IFF",
+        "mission_debriefing_default": "DB_02.IFF",
+        "player_faction": 1,
+        "level_filenames": ["l2525.ldf", "l2626.ldf", "l9898.ldf", "l0101.ldf", "l0202.ldf", "l0303.ldf", "l0404.ldf", "l0505.ldf", "l1010.ldf", "l1111.ldf", "l1212.ldf", "l2020.ldf", "l2121.ldf", "l2222.ldf", "l2323.ldf", "l3030.ldf", "l3131.ldf", "l3232.ldf", "l3333.ldf", "l3434.ldf", "l4040.ldf", "l4141.ldf", "l4242.ldf", "l4343.ldf", "l4444.ldf", "l5050.ldf", "l5151.ldf", "l5252.ldf", "l5353.ldf", "l5454.ldf", "l6060.ldf", "l6161.ldf", "l6262.ldf", "l6363.ldf", "l6464.ldf", "l6666.ldf", "l7070.ldf", "l7171.ldf", "l7272.ldf", "l7373.ldf", "l7474.ldf", "l7575.ldf", "l1515.ldf", "l9999.ldf"],
+        "target_mode": "next"
+      },
+      "md-ghorkov": {
+        "data_profile": "metropolisDawn",
+        "roster_profile": "metropolisDawn",
+        "mission_map_profile": "metropolisDawn",
+        "mission_debriefing_uses_briefing": true,
+        "mission_briefing_default": "MB_02.IFF",
+        "mission_debriefing_default": "DB_02.IFF",
+        "player_faction": 6,
+        "level_ids": [7, 14, 17, 19, 28, 35, 37, 39, 46, 48, 56, 58, 67, 69, 77, 79],
+        "targets_by_level": {"7": [14], "14": [17, 19], "17": [28], "19": [35], "28": [37, 39], "35": [46], "37": [48], "39": [56], "46": [58, 67], "48": [69], "56": [69], "58": [77], "67": [77], "69": [79], "77": [79], "79": [7]},
+        "player_robo_by_level": {"7": 176, "14": 176, "17": 176, "19": 176, "28": 176, "35": 176, "37": 177, "39": 177, "46": 177, "48": 177, "56": 177, "58": 177, "67": 177, "69": 177, "77": 177, "79": 177}
+      },
+      "md-taerkasten": {
+        "data_profile": "metropolisDawn",
+        "roster_profile": "metropolisDawn",
+        "mission_map_profile": "metropolisDawn",
+        "mission_debriefing_uses_briefing": true,
+        "mission_briefing_default": "MB_02.IFF",
+        "mission_debriefing_default": "DB_02.IFF",
+        "player_faction": 4,
+        "level_ids": [6, 8, 13, 16, 18, 29, 36, 38, 45, 47, 55, 57, 65, 68, 78],
+        "targets_by_level": {"6": [13, 16], "8": [45], "13": [18], "16": [8, 29], "18": [36, 38], "29": [45], "36": [47], "38": [55, 57], "45": [55, 57], "47": [65, 68], "55": [68], "57": [68], "65": [78], "68": [78], "78": [6]}
+      }
+    },
+    "generator2": {
+      "original": {
+        "data_profile": "original",
+        "mission_map_profile": null,
+        "mission_briefing_default": "MB_15.IFF",
+        "mission_debriefing_default": "DB_15.IFF",
+        "player_faction": "res",
+        "player_vehicle": 56,
+        "level_ids": [1, 2, 3, 4, 5, 10, 11, 12, 15, 20, 21, 22, 23, 25, 26, 30, 31, 32, 33, 34, 40, 41, 42, 43, 44, 50, 51, 52, 53, 54, 60, 61, 62, 63, 64, 66, 70, 71, 72, 73, 74, 75],
+        "targets_by_level": {"1": [2, 3], "2": [4], "3": [5], "4": [10], "5": [11, 12], "10": [20], "11": [21], "12": [22, 23], "15": [], "20": [30, 34], "21": [31], "22": [32], "23": [33], "25": [], "26": [], "30": [40], "31": [41], "32": [42], "33": [43], "34": [40, 44], "40": [50, 51], "41": [52], "42": [53], "43": [54], "44": [50], "50": [60], "51": [66], "52": [61, 62], "53": [63], "54": [64], "60": [70], "61": [75], "62": [72], "63": [73], "64": [74], "66": [71], "70": [15], "71": [15], "72": [15], "73": [15], "74": [15], "75": [15]},
+        "enemy_factions": ["sul", "myk", "tae", "bla", "gho"],
+        "vehicles_by_faction": {"res": [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16], "sul": [71, 72, 73, 74], "myk": [63, 64, 65, 66, 67, 68, 69, 70], "tae": [8, 32, 33, 34, 35, 36, 37, 38, 131], "gho": [22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 130], "bla": [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 71, 72, 73, 74, 63, 64, 65, 66, 67, 68, 69, 70, 8, 32, 33, 34, 35, 36, 37, 38, 131, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 130]},
+        "buildings_by_faction": {"res": [11, 63, 2, 28, 3], "sul": [10], "myk": [10, 13, 72], "tae": [17, 31, 53, 73], "bla": [18, 1, 54, 64], "gho": [30, 52, 12, 71]},
+        "host_vehicles": {"sul": 61, "myk": 58, "tae": 60, "bla": 62}
+      },
+      "md-ghorkov": {
+        "data_profile": "metropolisDawn",
+        "roster_profile": "metropolisDawn",
+        "mission_map_profile": "metropolisDawn",
+        "mission_debriefing_uses_briefing": true,
+        "mission_briefing_default": "MB_15.IFF",
+        "mission_debriefing_default": "DB_15.IFF",
+        "player_faction": "gho",
+        "level_ids": [7, 14, 17, 19, 28, 35, 37, 39, 46, 48, 56, 58, 67, 69, 77, 79],
+        "targets_by_level": {"7": [14], "14": [17, 19], "17": [28], "19": [35], "28": [37, 39], "35": [46], "37": [48], "39": [56], "46": [58, 67], "48": [69], "56": [69], "58": [77], "67": [77], "69": [79], "77": [79], "79": [7]},
+        "player_robo_by_level": {"7": 176, "14": 176, "17": 176, "19": 176, "28": 176, "35": 176, "37": 177, "39": 177, "46": 177, "48": 177, "56": 177, "58": 177, "67": 177, "69": 177, "77": 177, "79": 177}
+      },
+      "md-taerkasten": {
+        "data_profile": "metropolisDawn",
+        "roster_profile": "metropolisDawn",
+        "mission_map_profile": "metropolisDawn",
+        "mission_debriefing_uses_briefing": true,
+        "mission_briefing_default": "MB_15.IFF",
+        "mission_debriefing_default": "DB_15.IFF",
+        "player_faction": "tae",
+        "level_ids": [6, 8, 13, 16, 18, 29, 36, 38, 45, 47, 55, 57, 65, 68, 78],
+        "targets_by_level": {"6": [13, 16], "8": [45], "13": [18], "16": [8, 29], "18": [36, 38], "29": [45], "36": [47], "38": [55, 57], "45": [55, 57], "47": [65, 68], "55": [68], "57": [68], "65": [78], "68": [78], "78": [6]}
+      }
+    }
+  }
+}

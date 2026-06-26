@@ -7,6 +7,7 @@ from typing import Any
 
 from ..constants import (
     GENERATOR2_BUILDINGS,
+    GENERATOR2_FACTIONS,
     GENERATOR2_HOST_VEHICLES,
     GENERATOR2_LEVELS,
     GENERATOR2_VEHICLES,
@@ -38,6 +39,7 @@ class _Level:
         default_factory=lambda: {faction: list(buildings) for faction, buildings in GENERATOR2_BUILDINGS.items()}
     )
     host_vehicles: dict[str, int] = field(default_factory=lambda: {"res": 56, **GENERATOR2_HOST_VEHICLES})
+    enemy_factions: list[str] = field(default_factory=lambda: list(GENERATOR2_FACTIONS))
     gates: list[dict[str, Any]] = field(default_factory=list)
     bombs: list[dict[str, Any]] = field(default_factory=list)
     squads: list[dict[str, Any]] = field(default_factory=list)

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from .context import _State
+from .map_builder import Generator1MapBuilder
+from .scenario import Generator1ScenarioPlanner
 from .tables import (
     TECH_UPGRADE_BUILDING_IDS_BY_TYPE,
     TECH_UPGRADE_BUILDING_TILESETS,
@@ -24,12 +26,16 @@ from ..constants import (
 from ..ldf import LDFWriter
 
 
-class Generator1RendererMixin:
+class Generator1Renderer:
+    def __init__(self, scenario: Generator1ScenarioPlanner, map_builder: Generator1MapBuilder) -> None:
+        self._scenario = scenario
+        self._map_builder = map_builder
+
     def _write_level(self, state: _State) -> str:
         writer = LDFWriter(property_style="tabs")
         self._write_header(writer, state)
         self._write_brief_maps(writer, state)
-        self._seed_beam_gate_keys(state)
+        self._map_builder._seed_beam_gate_keys(state)
         self._write_beam_gate(writer, state)
         self._write_superitems(writer, state)
         self._write_robos(writer, state)
@@ -131,7 +137,7 @@ class Generator1RendererMixin:
         writer.property("viewangle", 23)
         writer.end_block()
         writer.line("")
-        for faction in self._enemy_factions(state):
+        for faction in self._scenario.enemy_factions(state):
             for slot in range(3):
                 world = state.ai_slot_world[faction][slot]
                 if world:
@@ -210,7 +216,7 @@ class Generator1RendererMixin:
         writer.line(";------------------------------------------------------------")
         if state.emit_player_enablement:
             self._write_enable_block(writer, state, state.player_faction)
-        for faction in self._enemy_factions(state):
+        for faction in self._scenario.enemy_factions(state):
             if any(state.ai_slot_world[faction]):
                 self._write_enable_block(writer, state, faction)
 

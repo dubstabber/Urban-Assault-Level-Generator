@@ -12,7 +12,6 @@ from ..constants import (
     BLG_SUPERITEM,
     BUILDING_TYP_BY_ID,
     GENERATOR2_FACTION_IDS,
-    GENERATOR2_FACTIONS,
     GENERATOR2_SET_LIST,
     TYP_GATE_CLOSED_1,
     TYP_GATE_CLOSED_2,
@@ -22,7 +21,7 @@ from ..constants import (
 from ..models import MapRows
 
 
-class Generator2MapBuilderMixin:
+class Generator2MapBuilder:
     def _make_map(self, level: _Level, map_type: str) -> None:
         level.excluded = self._get_station_sectors(level)
         current = self._reset_map(level, map_type)
@@ -239,9 +238,7 @@ class Generator2MapBuilderMixin:
 
     @staticmethod
     def _enemy_factions(level: _Level) -> list[str]:
-        if level.campaign_profile == "original":
-            return list(GENERATOR2_FACTIONS)
-        return [faction for faction in GENERATOR2_FACTION_IDS if faction != level.player_faction]
+        return list(level.enemy_factions)
 
     @staticmethod
     def _get_station_sectors(level: _Level) -> list[dict[str, Any]]:

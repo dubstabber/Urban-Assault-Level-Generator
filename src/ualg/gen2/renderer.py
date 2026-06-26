@@ -5,11 +5,15 @@ from __future__ import annotations
 from math import floor
 
 from .context import _Level
+from .map_builder import Generator2MapBuilder
 from ..constants import GENERATOR2_FACTION_IDS, GENERATOR2_SKIES
 from ..ldf import LDFWriter
 
 
-class Generator2RendererMixin:
+class Generator2Renderer:
+    def __init__(self, map_builder: Generator2MapBuilder) -> None:
+        self._map_builder = map_builder
+
     def _write_level(self, level: _Level) -> str:
         writer = LDFWriter(property_style="php")
         self._write_header(writer, level)
@@ -68,8 +72,8 @@ class Generator2RendererMixin:
                 writer.property("target_level", target)
             for _ in range(6):
                 if level.rng.rand_range(0, 1):
-                    writer.property("keysec_x", self._random_x(level))
-                    writer.property("keysec_y", self._random_y(level))
+                    writer.property("keysec_x", self._map_builder._random_x(level))
+                    writer.property("keysec_y", self._map_builder._random_y(level))
             writer.property("mb_status", "unknown")
             writer.end_block()
         writer.line("")
@@ -83,9 +87,9 @@ class Generator2RendererMixin:
         writer.line("begin_robo")
         writer.property("owner", GENERATOR2_FACTION_IDS[level.player_faction])
         writer.property("vehicle", level.player_vehicle)
-        writer.property("pos_x", self._get_position(station["x"]))
+        writer.property("pos_x", self._map_builder._get_position(station["x"]))
         writer.property("pos_y", level.rng.rand_range(20, 45) * -10)
-        writer.property("pos_z", self._get_position(station["y"], vertical=True))
+        writer.property("pos_z", self._map_builder._get_position(station["y"], vertical=True))
         writer.property("energy", energy)
         writer.property("reload_const", reload_const)
         writer.end_block()
@@ -106,9 +110,9 @@ class Generator2RendererMixin:
                 writer.line("begin_robo")
                 writer.property("owner", GENERATOR2_FACTION_IDS[faction])
                 writer.property("vehicle", host_vehicle)
-                writer.property("pos_x", self._get_position(station["x"]))
+                writer.property("pos_x", self._map_builder._get_position(station["x"]))
                 writer.property("pos_y", level.rng.rand_range(20, 45) * -10)
-                writer.property("pos_z", self._get_position(station["y"], vertical=True))
+                writer.property("pos_z", self._map_builder._get_position(station["y"], vertical=True))
                 writer.property("energy", energy)
                 writer.property("reload_const", reload_const)
                 if level.rng.rand_range(0, 1) == 0:
@@ -158,8 +162,8 @@ class Generator2RendererMixin:
             writer.property("owner", GENERATOR2_FACTION_IDS[squad["faction"]])
             writer.property("vehicle", squad["vehicle"])
             writer.property("num", squad["num"])
-            writer.property("pos_x", self._get_position(squad["x"]))
-            writer.property("pos_z", self._get_position(squad["y"], vertical=True))
+            writer.property("pos_x", self._map_builder._get_position(squad["x"]))
+            writer.property("pos_z", self._map_builder._get_position(squad["y"], vertical=True))
             writer.end_block()
         writer.line("")
 
@@ -167,7 +171,7 @@ class Generator2RendererMixin:
         writer.line("; Prototype Modifications")
         writer.line("")
         writer.line("include data:scripts/startup2.scr")
-        for faction in self._present_factions(level):
+        for faction in self._map_builder._present_factions(level):
             writer.line("")
             writer.line(f"begin_enable {GENERATOR2_FACTION_IDS[faction]}")
             for vehicle in level.vehicles_by_faction[faction]:

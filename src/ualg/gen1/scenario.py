@@ -15,7 +15,7 @@ from ..constants import (
 )
 
 
-class Generator1ScenarioMixin:
+class Generator1ScenarioPlanner:
     @staticmethod
     def category_for_skill(skill: int) -> int:
         return max(1, min(11, int(skill)))
@@ -158,6 +158,15 @@ class Generator1ScenarioMixin:
         state.superitem_flags[0] = state.rng.rand_float() < chances[0]
         state.superitem_flags[1] = state.rng.rand_float() < chances[1]
 
+    def apply_custom_options(self, state: _State, options: Generator1CustomOptions) -> None:
+        self._apply_custom_options(state, options)
+
+    def has_custom_scenario(self, options: Generator1CustomOptions) -> bool:
+        return self._has_custom_scenario(options)
+
+    def apply_scenario(self, state: _State) -> None:
+        self._apply_scenario(state)
+
     def _apply_category(self, state: _State) -> None:
         category = max(1, min(12, state.scenario_category))
         state.scenario_category = category
@@ -245,6 +254,12 @@ class Generator1ScenarioMixin:
     @staticmethod
     def _enemy_factions(state: _State) -> list[int]:
         return [faction for faction in range(1, 8) if faction != state.player_faction]
+
+    def enemy_faction(self, state: _State, faction: int) -> int:
+        return self._enemy_faction(state, faction)
+
+    def enemy_factions(self, state: _State) -> list[int]:
+        return self._enemy_factions(state)
 
 
 def _clamp_optional(value: int | None, minimum: int, maximum: int) -> int | None:

@@ -1,60 +1,60 @@
-"""Generator2 campaign profile selection."""
+"""Generator2 campaign profile resolution."""
 
 from __future__ import annotations
 
 from .context import _Level
-from ..constants import (
-    GENERATOR1_MD_GHORKOV_PLAYER_ROBO_BY_LEVEL,
-    GENERATOR2_CAMPAIGN_LEVEL_IDS,
-    GENERATOR2_CAMPAIGN_PROFILES,
-    GENERATOR2_MD_BUILDINGS,
-    GENERATOR2_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE,
-    GENERATOR2_MD_CAMPAIGN_TARGETS_BY_PROFILE,
-    GENERATOR2_MD_PLAYER_ROBOS,
-    GENERATOR2_MD_VEHICLES,
-)
-from ..data import UA_METROPOLIS_DAWN_PROFILE, ua_mission_briefing_maps
+from ..campaign_profiles import CampaignProfile, ProfileRegistry, default_profile_registry
 
 
-class Generator2ProfileMixin:
-    @staticmethod
-    def _normalize_campaign_profile(campaign_profile: str) -> str:
-        profile = campaign_profile.strip().lower()
-        if profile not in GENERATOR2_CAMPAIGN_PROFILES:
-            choices = ", ".join(GENERATOR2_CAMPAIGN_PROFILES)
-            raise ValueError(f"Unknown Generator2 campaign profile '{campaign_profile}'. Choose one of: {choices}.")
-        return profile
+class Generator2ProfileResolver:
+    def __init__(self, registry: ProfileRegistry | None = None) -> None:
+        self._registry = registry or default_profile_registry()
 
-    @staticmethod
-    def _campaign_level_ids(campaign_profile: str) -> list[int]:
-        if campaign_profile == "original":
-            return list(GENERATOR2_CAMPAIGN_LEVEL_IDS)
-        return list(GENERATOR2_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE[campaign_profile])
+    def normalize_campaign_profile(self, campaign_profile: str) -> str:
+        return self.profile(campaign_profile).profile_id
 
-    @staticmethod
-    def _apply_campaign_profile(level: _Level, campaign_profile: str) -> None:
-        level.campaign_profile = campaign_profile
-        if campaign_profile == "original":
-            return
-        level.player_faction = "gho" if campaign_profile == "md-ghorkov" else "tae"
+    def profile(self, campaign_profile: str) -> CampaignProfile:
+        return self._registry.get("generator2", campaign_profile)
+
+    def campaign_level_ids(self, campaign_profile: str) -> list[int]:
+        return list(self.profile(campaign_profile).level_ids)
+
+    def original_level_ids(self) -> set[int]:
+        return set(self.profile("original").level_ids)
+
+    def apply_campaign_profile(self, level: _Level, campaign_profile: str) -> None:
+        profile = self.profile(campaign_profile)
+        level.campaign_profile = profile.profile_id
+        level.player_faction = str(profile.player_faction)
         level.targets_by_level = {
-            key: list(value)
-            for key, value in GENERATOR2_MD_CAMPAIGN_TARGETS_BY_PROFILE[campaign_profile].items()
+            level_id: list(targets)
+            for level_id, targets in profile.targets_by_level.items()
         }
-        level.vehicles_by_faction = {faction: list(vehicles) for faction, vehicles in GENERATOR2_MD_VEHICLES.items()}
-        level.buildings_by_faction = {faction: list(buildings) for faction, buildings in GENERATOR2_MD_BUILDINGS.items()}
-        level.mission_briefing_map = Generator2ProfileMixin._mission_briefing_map_for_level(level.level_id)
-        level.mission_debriefing_map = level.mission_briefing_map
-        if level.player_faction == "gho":
-            level.player_vehicle = GENERATOR1_MD_GHORKOV_PLAYER_ROBO_BY_LEVEL.get(level.level_id, 177)
-        else:
-            level.player_vehicle = GENERATOR2_MD_PLAYER_ROBOS["tae"][0]
+        level.vehicles_by_faction = {
+            str(faction): list(vehicles)
+            for faction, vehicles in profile.roster.vehicles_by_faction.items()
+        }
+        level.buildings_by_faction = {
+            str(faction): list(buildings)
+            for faction, buildings in profile.roster.buildings_by_faction.items()
+        }
+        level.host_vehicles = {
+            str(faction): int(vehicle)
+            for faction, vehicle in profile.roster.host_vehicle_by_faction.items()
+        }
+        level.enemy_factions = list(profile.enemy_factions)
+        level.mission_briefing_map = profile.mission_briefing_map_for_level(level.level_id)
+        level.mission_debriefing_map = profile.mission_debriefing_map_for_level(level.level_id)
+        level.player_vehicle = self._player_vehicle_for_level(profile, level.level_id)
 
     @staticmethod
-    def _mission_briefing_map_for_level(level_id: int) -> str:
-        maps = ua_mission_briefing_maps(UA_METROPOLIS_DAWN_PROFILE)
-        expected = f"mb_{level_id:02d}.iff"
-        for map_name in maps:
-            if map_name.lower() == expected:
-                return map_name.upper()
-        return maps[level_id % len(maps)].upper()
+    def _player_vehicle_for_level(profile: CampaignProfile, level_id: int) -> int:
+        if profile.player_vehicle:
+            return profile.player_vehicle
+        robos = list(profile.roster.player_robo_ids_by_faction.get(profile.player_faction, ()))
+        if profile.player_robo_by_level:
+            fallback = robos[1] if len(robos) > 1 else robos[0] if robos else 56
+            return profile.player_robo_by_level.get(level_id, fallback)
+        if robos:
+            return robos[0]
+        return 56

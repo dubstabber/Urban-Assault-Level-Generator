@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .context import _State
+from .scenario import Generator1ScenarioPlanner
 from ..core.maps import filled_rows
 from ..constants import (
     BLG_PLAYER_BASE,
@@ -29,7 +30,10 @@ from ..constants import (
 from ..data import tileset_compatibility
 
 
-class Generator1MapBuilderMixin:
+class Generator1MapBuilder:
+    def __init__(self, scenario: Generator1ScenarioPlanner) -> None:
+        self._scenario = scenario
+
     def _choose_map_size(self, state: _State) -> None:
         state.width = state.rng.rand_range(state.min_width, state.max_width)
         state.height = state.rng.rand_range(state.min_height, state.max_height)
@@ -70,7 +74,7 @@ class Generator1MapBuilderMixin:
 
     def _init_own_map(self, state: _State) -> None:
         owners = [0, state.player_faction] + [
-            faction for faction in self._enemy_factions(state) if state.faction_enables[faction]
+            faction for faction in self._scenario.enemy_factions(state) if state.faction_enables[faction]
         ]
         rows = filled_rows(state.width, state.height)
         for y in range(1, state.height - 1):
@@ -89,7 +93,7 @@ class Generator1MapBuilderMixin:
 
     def _place_hosts_and_ambient(self, state: _State) -> None:
         self._place_player_host(state)
-        for faction in self._enemy_factions(state):
+        for faction in self._scenario.enemy_factions(state):
             for slot in range(3):
                 if state.ai_slot_present[faction][slot]:
                     self._place_ai_host(state, faction, slot)
@@ -159,7 +163,7 @@ class Generator1MapBuilderMixin:
 
     def _pick_present_faction(self, state: _State) -> int:
         factions = [state.player_faction] + [
-            faction for faction in self._enemy_factions(state) if state.faction_enables[faction]
+            faction for faction in self._scenario.enemy_factions(state) if state.faction_enables[faction]
         ]
         return state.rng.choice(factions)
 

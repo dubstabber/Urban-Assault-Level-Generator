@@ -54,6 +54,7 @@ from ualg.generator1 import (
 )
 from ualg.generator2 import Generator2
 from ualg.gen2.context import _Level as Generator2Level
+from ualg.gen2.map_builder import Generator2MapBuilder
 from ualg.ldf import parse_maps
 from ualg.rng import MSVCRTRandom
 
@@ -449,7 +450,7 @@ class CoreTests(unittest.TestCase):
                     self.assertIn(typ[y][x], allowed)
 
     def test_generator2_height_map_uses_y_coordinate_range(self) -> None:
-        class TrackingGenerator(Generator2):
+        class TrackingMapBuilder(Generator2MapBuilder):
             def __init__(self) -> None:
                 self.random_x_calls = 0
                 self.random_y_calls = 0
@@ -462,7 +463,7 @@ class CoreTests(unittest.TestCase):
                 self.random_y_calls += 1
                 return 1
 
-        generator = TrackingGenerator()
+        generator = TrackingMapBuilder()
         level = Generator2Level(level_id=1, rng=MSVCRTRandom(123), seed=123)
         level.width = 12
         level.height = 6
