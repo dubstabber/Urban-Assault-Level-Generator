@@ -2,6 +2,19 @@
 
 from __future__ import annotations
 
+from .data import (
+    UA_METROPOLIS_DAWN_PROFILE,
+    UA_ORIGINAL_PROFILE,
+    ua_building_labels,
+    ua_building_typ_map,
+    ua_faction_buildings,
+    ua_faction_player_robo_ids,
+    ua_faction_robo_ids,
+    ua_faction_units,
+    ua_level_ids,
+    ua_unit_labels,
+)
+
 TYP_MAP_INTERIOR_LOOKUP = [
     0x00, 0x01, 0x02, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
     0x0C, 0x0D, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
@@ -67,48 +80,128 @@ GENERATOR1_CAMPAIGN_FILENAMES = [
     "l1515.ldf", "l9999.ldf",
 ]
 
-GENERATOR1_PLAYER_TECH_VEHICLE_IDS = [1, 16, 2, 3, 12, 11, 10, 6, 15, 14, 4, 7, 5, 133, 134]
-GENERATOR1_PLAYER_TECH_BUILDING_IDS = [63, 1, 11, 64, 28, 2, 3, 54]
+GENERATOR1_MD_CAMPAIGN_LEVEL_IDS = ua_level_ids(UA_METROPOLIS_DAWN_PROFILE)
+GENERATOR1_MD_CAMPAIGN_FILENAMES = [f"L{level_id:02d}{level_id:02d}.ldf" for level_id in GENERATOR1_MD_CAMPAIGN_LEVEL_IDS]
+GENERATOR1_CAMPAIGN_PROFILES = ("original", "md-ghorkov", "md-taerkasten")
+GENERATOR1_MD_GHORKOV_LEVEL_IDS = [7, 14, 17, 19, 28, 35, 37, 39, 46, 48, 56, 58, 67, 69, 77, 79]
+GENERATOR1_MD_TAERKASTEN_LEVEL_IDS = [6, 8, 13, 16, 18, 29, 36, 38, 45, 47, 55, 57, 65, 68, 78]
+GENERATOR1_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE = {
+    "md-ghorkov": GENERATOR1_MD_GHORKOV_LEVEL_IDS,
+    "md-taerkasten": GENERATOR1_MD_TAERKASTEN_LEVEL_IDS,
+}
+GENERATOR1_MD_CAMPAIGN_TARGETS_BY_PROFILE = {
+    "md-ghorkov": {
+        7: [14],
+        14: [17, 19],
+        17: [28],
+        19: [35],
+        28: [37, 39],
+        35: [46],
+        37: [48],
+        39: [56],
+        46: [58, 67],
+        48: [69],
+        56: [69],
+        58: [77],
+        67: [77],
+        69: [79],
+        77: [79],
+        79: [7],
+    },
+    "md-taerkasten": {
+        6: [13, 16],
+        8: [45],
+        13: [18],
+        16: [8, 29],
+        18: [36, 38],
+        29: [45],
+        36: [47],
+        38: [55, 57],
+        45: [55, 57],
+        47: [65, 68],
+        55: [68],
+        57: [68],
+        65: [78],
+        68: [78],
+        78: [6],
+    },
+}
+GENERATOR1_MD_GHORKOV_PLAYER_ROBO_BY_LEVEL = {
+    7: 176,
+    14: 176,
+    17: 176,
+    19: 176,
+    28: 176,
+    35: 176,
+    37: 177,
+    39: 177,
+    46: 177,
+    48: 177,
+    56: 177,
+    58: 177,
+    67: 177,
+    69: 177,
+    77: 177,
+    79: 177,
+}
 
-VEHICLES_PLAYER_IDS = [1, 2, 3, 12, 11, 10, 6, 15, 14, 4, 7, 5, 133, 134]
-VEHICLES_PLAYER_PROBABILITIES = [2, 2, 3, 5, 5, 2, 2, 3, 4, 4, 4, 2, 6, 6]
-BUILDINGS_PLAYER_IDS = [63, 1, 11, 64, 28, 2, 3, 54]
+
+def _dedupe(values: list[int]) -> list[int]:
+    return list(dict.fromkeys(values))
+
+
+def _with_black_sect_mixed_units(units: dict[int, list[int]]) -> dict[int, list[int]]:
+    result = {owner: list(values) for owner, values in units.items()}
+    mixed: list[int] = []
+    for faction in (FACTION_PLAYER, FACTION_SULGOGARS, FACTION_MYKONIANS, FACTION_TAERKASTEN, FACTION_GHORKOVS):
+        mixed.extend(result.get(faction, []))
+    mixed.extend(result.get(FACTION_BLACK_SECT, []))
+    result[FACTION_BLACK_SECT] = _dedupe(mixed)
+    return result
+
+
+def _with_black_sect_mixed_buildings(buildings: dict[int, list[int]]) -> dict[int, list[int]]:
+    result = {owner: list(values) for owner, values in buildings.items()}
+    mixed: list[int] = []
+    for faction in (
+        FACTION_PLAYER,
+        FACTION_SULGOGARS,
+        FACTION_MYKONIANS,
+        FACTION_TAERKASTEN,
+        FACTION_BLACK_SECT,
+        FACTION_GHORKOVS,
+    ):
+        mixed.extend(result.get(faction, []))
+    result[FACTION_BLACK_SECT] = _dedupe(mixed)
+    return result
+
+
+def _default_robo_ids(robos: dict[int, list[int]]) -> dict[int, int]:
+    return {owner: values[-1] for owner, values in robos.items() if values}
+
+
+VEHICLES_BY_FACTION = _with_black_sect_mixed_units(ua_faction_units(UA_ORIGINAL_PROFILE))
+BUILDINGS_BY_FACTION = _with_black_sect_mixed_buildings(ua_faction_buildings(UA_ORIGINAL_PROFILE))
+METROPOLIS_DAWN_VEHICLES_BY_FACTION = _with_black_sect_mixed_units(ua_faction_units(UA_METROPOLIS_DAWN_PROFILE))
+METROPOLIS_DAWN_BUILDINGS_BY_FACTION = _with_black_sect_mixed_buildings(
+    ua_faction_buildings(UA_METROPOLIS_DAWN_PROFILE)
+)
+
+GENERATOR1_PLAYER_TECH_VEHICLE_IDS = [vehicle for vehicle in VEHICLES_BY_FACTION[FACTION_PLAYER] if vehicle != 9]
+GENERATOR1_PLAYER_TECH_BUILDING_IDS = list(BUILDINGS_BY_FACTION[FACTION_PLAYER])
+
+_VEHICLE_PROBABILITY_BY_ID = {1: 2, 2: 2, 3: 3, 12: 5, 11: 5, 10: 2, 6: 2, 15: 3, 14: 4, 4: 4, 7: 4, 5: 2, 133: 6, 134: 6}
+VEHICLES_PLAYER_IDS = [vehicle for vehicle in VEHICLES_BY_FACTION[FACTION_PLAYER] if vehicle in _VEHICLE_PROBABILITY_BY_ID]
+VEHICLES_PLAYER_PROBABILITIES = [_VEHICLE_PROBABILITY_BY_ID[vehicle] for vehicle in VEHICLES_PLAYER_IDS]
+BUILDINGS_PLAYER_IDS = list(BUILDINGS_BY_FACTION[FACTION_PLAYER])
 BUILDINGS_PLAYER_PROBABILITIES = [3, 4, 4, 5, 3, 4, 3, 4]
 
-VEHICLES_BY_FACTION = {
-    FACTION_PLAYER: [1, 16, 2, 3, 12, 11, 10, 6, 15, 14, 4, 7, 5, 9, 133, 134],
-    FACTION_SULGOGARS: [73, 71, 72, 74],
-    FACTION_MYKONIANS: [65, 64, 66, 68, 63, 69, 70, 67],
-    FACTION_TAERKASTEN: [32, 37, 33, 8, 36, 38, 131, 34, 35],
-    FACTION_BLACK_SECT: [
-        1, 16, 2, 3, 12, 11, 10, 6, 15, 14, 4, 7, 5, 9, 133, 134,
-        73, 71, 72, 74, 65, 64, 66, 68, 63, 69, 70, 67,
-        32, 37, 33, 8, 36, 38, 131, 34, 35,
-        22, 26, 24, 28, 25, 31, 130, 27, 30, 29,
-    ],
-    FACTION_GHORKOVS: [22, 26, 24, 28, 25, 23, 31, 130, 27, 30, 29],
-    FACTION_TUTOR: [142],
-}
-
-BUILDINGS_BY_FACTION = {
-    FACTION_PLAYER: BUILDINGS_PLAYER_IDS,
-    FACTION_SULGOGARS: [10],
-    FACTION_MYKONIANS: [10, 13, 72],
-    FACTION_TAERKASTEN: [53, 17, 31, 73],
-    FACTION_BLACK_SECT: [63, 1, 11, 64, 28, 2, 3, 54, 10, 13, 72, 53, 17, 31, 73, 18, 52, 12, 30, 71],
-    FACTION_GHORKOVS: [52, 12, 30, 71],
-    FACTION_TUTOR: [],
-}
-
-HOST_VEHICLE_BY_FACTION = {
-    FACTION_PLAYER: 56,
-    FACTION_SULGOGARS: 61,
-    FACTION_MYKONIANS: 58,
-    FACTION_TAERKASTEN: 60,
-    FACTION_BLACK_SECT: 62,
-    FACTION_GHORKOVS: 57,
-    FACTION_TUTOR: 132,
-}
+HOST_VEHICLE_BY_FACTION = _default_robo_ids(ua_faction_robo_ids(UA_ORIGINAL_PROFILE))
+METROPOLIS_DAWN_PLAYER_ROBOS_BY_FACTION = ua_faction_player_robo_ids(UA_METROPOLIS_DAWN_PROFILE)
+METROPOLIS_DAWN_HOST_VEHICLE_BY_FACTION = _default_robo_ids(ua_faction_robo_ids(UA_METROPOLIS_DAWN_PROFILE))
+METROPOLIS_DAWN_PLAYER_HOST_VEHICLE_BY_FACTION = _default_robo_ids(
+    METROPOLIS_DAWN_PLAYER_ROBOS_BY_FACTION
+)
 
 HOST_BUILDING_BY_FACTION = {
     FACTION_PLAYER: [63, 1, 11, 64],
@@ -121,12 +214,18 @@ HOST_BUILDING_BY_FACTION = {
 }
 
 BUILDING_TYP_BY_ID = {
-    63: 201, 1: 201, 11: 201, 64: 201,
-    28: 205, 2: 200, 3: 204, 54: 204,
-    10: 15, 13: 239, 72: 240,
-    53: 15, 17: 15, 31: 207, 73: 240,
-    18: 204, 52: 15, 12: 15, 30: 207, 71: 240,
+    **ua_building_typ_map(UA_ORIGINAL_PROFILE),
+    **ua_building_typ_map(UA_METROPOLIS_DAWN_PROFILE),
     35: TYP_SUPERITEM,
+}
+
+VEHICLE_LABELS_BY_ID = {
+    **ua_unit_labels(UA_ORIGINAL_PROFILE),
+    **ua_unit_labels(UA_METROPOLIS_DAWN_PROFILE),
+}
+BUILDING_LABELS_BY_ID = {
+    **ua_building_labels(UA_ORIGINAL_PROFILE),
+    **ua_building_labels(UA_METROPOLIS_DAWN_PROFILE),
 }
 
 SKY_OPTIONS = [

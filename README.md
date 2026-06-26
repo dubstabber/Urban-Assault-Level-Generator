@@ -7,8 +7,6 @@ Implemented targets:
 - `generator1`: Random UA-derived terrain and campaign generator, defaulting to the improved recovered behavior.
 - `generator2`: PHP-derived.
 
-The old deleted pool/tech-tree Generator2 is intentionally out of scope.
-
 Compatibility policy:
 
 - `generator1` defaults to improved playable output. Use `--strict-parity` to disable the improved tileset filtering path where supported.

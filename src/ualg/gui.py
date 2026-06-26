@@ -23,12 +23,16 @@ from .constants import (
     FACTION_TAERKASTEN,
     FACTION_TUTOR,
     GENERATOR1_CAMPAIGN_FILENAMES,
+    GENERATOR1_CAMPAIGN_PROFILES,
     GENERATOR2_LEVELS,
+    BUILDING_LABELS_BY_ID,
     BUILDINGS_BY_FACTION,
+    VEHICLE_LABELS_BY_ID,
     VEHICLES_BY_FACTION,
     level_id_from_filename,
     level_filename,
 )
+from .data import UA_ORIGINAL_PROFILE, ua_faction_robo_names
 from .generator1 import Generator1, Generator1CustomOptions
 from .generator2 import Generator2
 from .legacy_resources import LegacyControl, LegacyDialog
@@ -68,7 +72,11 @@ CUSTOM_WIZARD_PAGE_TITLES = [
     "Stoudson Bombs",
     "Build Options",
 ]
-GHORKOV_HOST_VEHICLES = {"Tarantul 1": 59, "Tarantul 2": 57}
+GHORKOV_HOST_VEHICLES = {
+    name: robo_id
+    for robo_id, name in ua_faction_robo_names(UA_ORIGINAL_PROFILE)[FACTION_GHORKOVS].items()
+}
+GHORKOV_HOST_VEHICLE_ALIASES = {"Tarantul 1": 59, "Tarantul 2": 57}
 RESISTANCE_NEW_BUILDING_IDS = tuple(range(38, 50)) + tuple(range(90, 94))
 BLACK_SECT_NEW_BUILDING_IDS = tuple(range(38, 50)) + tuple(range(90, 97))
 NEW_BUILDING_IDS = set(BLACK_SECT_NEW_BUILDING_IDS)
@@ -168,6 +176,8 @@ BUILDING_LABELS = {
     95: "New Building 95",
     96: "New Building 96",
 }
+VEHICLE_LABELS.update(VEHICLE_LABELS_BY_ID)
+BUILDING_LABELS.update(BUILDING_LABELS_BY_ID)
 
 
 @dataclass(slots=True)
@@ -209,7 +219,7 @@ class CustomWizardState:
     player_energy: int = 1500
     host_present: dict[int, list[bool]] = field(default_factory=_default_host_slots)
     host_energy: dict[int, list[int]] = field(default_factory=_default_host_energy_slots)
-    ghorkov_host_types: list[str] = field(default_factory=lambda: ["Tarantul 1", "Tarantul 1", "Tarantul 1"])
+    ghorkov_host_types: list[str] = field(default_factory=lambda: ["Turantul I", "Turantul I", "Turantul I"])
     gate_target_level_id: int = 0
     random_gate_keys: bool = True
     gate_key_count: int = 0
@@ -259,12 +269,13 @@ def custom_wizard_options_from_state(
             for slot in range(3)
         ]
         if faction == FACTION_GHORKOVS:
-            host_types = (state.ghorkov_host_types + ["Tarantul 1", "Tarantul 1", "Tarantul 1"])[:3]
+            host_types = (state.ghorkov_host_types + ["Turantul I", "Turantul I", "Turantul I"])[:3]
             vehicles = []
             for slot, host_type in enumerate(host_types):
-                if present[slot] and host_type not in GHORKOV_HOST_VEHICLES:
-                    raise ValueError(f"Ghorkov host #{slot + 1} must use a valid Tarantul host type.")
-                vehicles.append(GHORKOV_HOST_VEHICLES.get(host_type, 0) if present[slot] else 0)
+                vehicle_id = _ghorkov_host_vehicle_id(host_type)
+                if present[slot] and not vehicle_id:
+                    raise ValueError(f"Ghorkov host #{slot + 1} must use a valid Turantul host type.")
+                vehicles.append(vehicle_id if present[slot] else 0)
             options.ai_slot_host_vehicle_id[faction] = vehicles
 
     if not any_host:
@@ -693,7 +704,8 @@ class LegacyWizard:
                     choices.append(f"{level_id} ; {filename}")
             return {1017: choices}
         if dialog_id == 139:
-            return {1003: ["Tarantul 1", "Tarantul 2"], 1004: ["Tarantul 1", "Tarantul 2"], 1005: ["Tarantul 1", "Tarantul 2"]}
+            values = list(GHORKOV_HOST_VEHICLES)
+            return {1003: values, 1004: values, 1005: values}
         return {}
 
     def _entry_defaults(self, dialog_id: int) -> dict[int, tk.StringVar]:
@@ -803,12 +815,14 @@ class LegacyWizard:
                     for index, control_id in enumerate(energies)
                 ]
             if faction == FACTION_GHORKOVS:
+                vehicles: list[int] = []
                 for index, combo_id in enumerate(combos):
                     combo_value = page.entry_vars.get(combo_id)
-                    if present[index] and combo_value and combo_value.get() == "Tarantul 2":
-                        options.ai_host_vehicle_id[FACTION_GHORKOVS] = 59
-                    elif present[index]:
-                        options.ai_host_vehicle_id.setdefault(FACTION_GHORKOVS, 57)
+                    vehicles.append(
+                        _ghorkov_host_vehicle_id(combo_value.get() if combo_value else "") if present[index] else 0
+                    )
+                if any(vehicles):
+                    options.ai_slot_host_vehicle_id[FACTION_GHORKOVS] = vehicles
         player_energy = _legacy_energy(page.entry_vars.get(1049))
         if player_energy:
             options.player_energy = player_energy
@@ -920,7 +934,7 @@ class CustomWizardDialog:
             faction: [tk.StringVar(value="1500") for _ in range(3)]
             for faction in CUSTOM_WIZARD_FACTIONS
         }
-        self.ghorkov_type_vars = [tk.StringVar(value="Tarantul 1") for _ in range(3)]
+        self.ghorkov_type_vars = [tk.StringVar(value="Turantul I") for _ in range(3)]
 
         self.gate_target_var = tk.StringVar(value="0 ; No Target")
         self.random_gate_keys_var = tk.BooleanVar(value=True)
@@ -1324,6 +1338,7 @@ class Generator1GUI:
         self.custom_file_var = tk.StringVar(value=settings.custom_level_file)
         self.exe_var = tk.StringVar(value=settings.exe_location)
         self.campaign_dir_var = tk.StringVar(value=settings.campaign_directory)
+        self.generator1_campaign_profile_var = tk.StringVar(value="original")
         self.generator2_single_file_var = tk.StringVar(value=settings.generator2_single_level_file)
         self.generator2_campaign_dir_var = tk.StringVar(value=settings.generator2_campaign_directory)
         self.generator2_level_id_var = tk.StringVar(value="1")
@@ -1375,17 +1390,28 @@ class Generator1GUI:
         tk.Button(menu, text="Custom Random Level Generator Wizard", command=self._make_custom_single).grid(
             row=2, column=0, columnspan=2, sticky="ew", pady=2
         )
+        profile_row = tk.Frame(menu)
+        profile_row.grid(row=3, column=0, columnspan=2, sticky="ew", pady=2)
+        profile_row.columnconfigure(1, weight=1)
+        tk.Label(profile_row, text="Generator1 campaign profile:", anchor="w").grid(row=0, column=0, sticky="w", padx=(0, 6))
+        ttk.Combobox(
+            profile_row,
+            textvariable=self.generator1_campaign_profile_var,
+            values=list(GENERATOR1_CAMPAIGN_PROFILES),
+            state="readonly",
+            width=16,
+        ).grid(row=0, column=1, sticky="ew")
         tk.Button(menu, text="Create a WHOLE CAMPAIGN", command=self._make_campaign).grid(
-            row=3, column=0, columnspan=2, sticky="ew", pady=2
+            row=4, column=0, columnspan=2, sticky="ew", pady=2
         )
-        tk.Button(menu, text="Credits", command=self._show_credits).grid(row=4, column=0, sticky="ew", padx=(0, 2), pady=2)
+        tk.Button(menu, text="Credits", command=self._show_credits).grid(row=5, column=0, sticky="ew", padx=(0, 2), pady=2)
         tk.Button(menu, text="Read The License Agreement", command=self._show_license).grid(
-            row=4, column=1, sticky="ew", padx=(2, 0), pady=2
+            row=5, column=1, sticky="ew", padx=(2, 0), pady=2
         )
         tk.Button(menu, text="Create Backup", command=self._create_backup).grid(
-            row=5, column=0, sticky="ew", padx=(0, 2), pady=2
+            row=6, column=0, sticky="ew", padx=(0, 2), pady=2
         )
-        tk.Button(menu, text="Exit", command=self._exit).grid(row=5, column=1, sticky="ew", padx=(2, 0), pady=2)
+        tk.Button(menu, text="Exit", command=self._exit).grid(row=6, column=1, sticky="ew", padx=(2, 0), pady=2)
 
         notice = (
             "YOU ARE BOUND TO THE TERMS AND CONDITIONS IN THE LICENSE AGREEMENT IF YOU USE\n"
@@ -1612,7 +1638,8 @@ class Generator1GUI:
             dialog = LegacyModal(self.root, self.legacy_dialogs[LEGACY_CAMPAIGN_DIALOG])
             if not dialog.run():
                 return
-        self._generate_campaign(directory, seed=seed)
+        campaign_profile = self.generator1_campaign_profile_var.get().strip() or "original"
+        self._generate_campaign(directory, seed=seed, campaign_profile=campaign_profile)
 
     def _make_generator2_single(self) -> None:
         level_id = self._generator2_level_id()
@@ -1685,11 +1712,16 @@ class Generator1GUI:
         self._set_status(f"Wrote {written}")
         messagebox.showinfo("Level Created", "\n".join(lines), parent=self.root)
 
-    def _generate_campaign(self, directory: Path, seed: int) -> None:
+    def _generate_campaign(self, directory: Path, seed: int, campaign_profile: str) -> None:
         try:
             self._set_status("Generating campaign...")
             backup_dir, moved = backup_campaign_ldfs(directory)
-            campaign = Generator1().generate_campaign(seed=seed, difficulty=5, improved=True)
+            campaign = Generator1().generate_campaign(
+                seed=seed,
+                difficulty=5,
+                improved=True,
+                campaign_profile=campaign_profile,
+            )
             written = campaign.write(directory)
             self._save_settings_quiet()
         except Exception as exc:
@@ -1697,7 +1729,11 @@ class Generator1GUI:
             messagebox.showerror("Campaign Generation Failed", str(exc), parent=self.root)
             return
 
-        lines = [f"Wrote {len(written)} Generator1 levels to {directory}", f"Seed: {campaign.seed}"]
+        lines = [
+            f"Wrote {len(written)} Generator1 levels to {directory}",
+            f"Seed: {campaign.seed}",
+            f"Profile: {campaign_profile}",
+        ]
         if backup_dir is not None:
             lines.append(f"Backed up {len(moved)} existing LDF files to {backup_dir}")
         self._set_status(f"Wrote {len(written)} campaign levels.")
@@ -2030,6 +2066,10 @@ def _building_options_for_faction(faction: int, *, allow_new_buildings: bool = T
 def _option_label(kind: str, value: int) -> str:
     labels = VEHICLE_LABELS if kind == "vehicle" else BUILDING_LABELS
     return f"{labels.get(value, kind.title())} ({value})"
+
+
+def _ghorkov_host_vehicle_id(host_type: str) -> int:
+    return GHORKOV_HOST_VEHICLES.get(host_type, GHORKOV_HOST_VEHICLE_ALIASES.get(host_type, 0))
 
 
 def _ordered_selected(selected: set[int], allowed: Sequence[int]) -> list[int]:

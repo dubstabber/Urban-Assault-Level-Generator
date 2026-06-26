@@ -21,10 +21,18 @@ from .constants import (
     FACTION_TAERKASTEN,
     FACTION_TUTOR,
     GENERATOR1_CAMPAIGN_FILENAMES,
+    GENERATOR1_CAMPAIGN_PROFILES,
+    GENERATOR1_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE,
+    GENERATOR1_MD_CAMPAIGN_TARGETS_BY_PROFILE,
+    GENERATOR1_MD_GHORKOV_PLAYER_ROBO_BY_LEVEL,
     GENERATOR1_PLAYER_TECH_BUILDING_IDS,
     GENERATOR1_PLAYER_TECH_VEHICLE_IDS,
     HOST_BUILDING_BY_FACTION,
     HOST_VEHICLE_BY_FACTION,
+    METROPOLIS_DAWN_BUILDINGS_BY_FACTION,
+    METROPOLIS_DAWN_HOST_VEHICLE_BY_FACTION,
+    METROPOLIS_DAWN_PLAYER_ROBOS_BY_FACTION,
+    METROPOLIS_DAWN_VEHICLES_BY_FACTION,
     SKY_OPTIONS,
     TYP_BORDER_BOTTOM,
     TYP_BORDER_BOTTOM_LEFT,
@@ -146,9 +154,12 @@ class _State:
     level_id: int = 1
     scenario_category: int = 0
     improved: bool = True
+    campaign_profile: str = "original"
+    player_faction: int = FACTION_PLAYER
     generator1_campaign_mode: bool = False
     emit_player_enablement: bool = True
     gate_target_level_id: int = 0
+    gate_target_level_ids: list[int] = field(default_factory=list)
     min_width: int = 8
     max_width: int = 20
     min_height: int = 8
@@ -157,6 +168,7 @@ class _State:
     height: int = 0
     tileset: int = 1
     player_energy: int = 500000
+    player_host_vehicle_id: int = 0
     faction_enables: list[bool] = field(default_factory=lambda: [False] * 8)
     ai_slot_present: list[list[bool]] = field(default_factory=lambda: [[False] * 3 for _ in range(8)])
     ai_slot_energy: list[list[int]] = field(default_factory=lambda: [[0] * 3 for _ in range(8)])
@@ -171,8 +183,17 @@ class _State:
     base_y: int = 0
     player_host_x: int = 0
     player_host_y: int = 0
+    player_tech_vehicle_ids: list[int] = field(default_factory=lambda: list(GENERATOR1_PLAYER_TECH_VEHICLE_IDS))
+    player_tech_building_ids: list[int] = field(default_factory=lambda: list(GENERATOR1_PLAYER_TECH_BUILDING_IDS))
     player_vehicle_flags: list[bool] = field(default_factory=lambda: [False] * len(GENERATOR1_PLAYER_TECH_VEHICLE_IDS))
     player_building_flags: list[bool] = field(default_factory=lambda: [False] * len(GENERATOR1_PLAYER_TECH_BUILDING_IDS))
+    vehicles_by_faction: dict[int, list[int]] = field(
+        default_factory=lambda: {faction: list(vehicles) for faction, vehicles in VEHICLES_BY_FACTION.items()}
+    )
+    buildings_by_faction: dict[int, list[int]] = field(
+        default_factory=lambda: {faction: list(buildings) for faction, buildings in BUILDINGS_BY_FACTION.items()}
+    )
+    host_vehicle_by_faction: dict[int, int] = field(default_factory=lambda: dict(HOST_VEHICLE_BY_FACTION))
     maps: dict[str, MapRows] = field(default_factory=dict)
     gate_keys: list[tuple[int, int]] = field(default_factory=list)
     gate_key_count_override: int | None = None
@@ -220,31 +241,100 @@ class Generator1:
         state.gate_target_level_id = 0
         return self._generate(state, "level_01.ldf")
 
-    def generate_campaign(self, seed: int = 0, difficulty: int = 5, improved: bool = True) -> GeneratedCampaign:
+    def generate_campaign(
+        self,
+        seed: int = 0,
+        difficulty: int = 5,
+        improved: bool = True,
+        campaign_profile: str = "original",
+    ) -> GeneratedCampaign:
+        campaign_profile = self._normalize_campaign_profile(campaign_profile)
         seed = self._normalize_seed(seed)
         rng = MSVCRTRandom(seed)
-        vehicle_flags = [False] * len(GENERATOR1_PLAYER_TECH_VEHICLE_IDS)
-        building_flags = [False] * len(GENERATOR1_PLAYER_TECH_BUILDING_IDS)
+        filenames = self._campaign_filenames(campaign_profile)
+        player_tech_vehicle_ids = self._player_tech_vehicle_ids(campaign_profile)
+        player_tech_building_ids = self._player_tech_building_ids(campaign_profile)
+        vehicle_flags = [False] * len(player_tech_vehicle_ids)
+        building_flags = [False] * len(player_tech_building_ids)
         if len(vehicle_flags) > 2:
             vehicle_flags[2] = True
         levels: list[GeneratedLevel] = []
-        for i, filename in enumerate(GENERATOR1_CAMPAIGN_FILENAMES):
+        for i, filename in enumerate(filenames):
             state = _State(rng=rng, seed=rng.state, difficulty=difficulty, improved=improved)
+            self._apply_campaign_profile(state, campaign_profile)
             state.level_index = i + 1
             state.level_id = level_id_from_filename(filename)
             state.generator1_campaign_mode = True
             state.emit_player_enablement = False
+            state.player_tech_vehicle_ids = list(player_tech_vehicle_ids)
+            state.player_tech_building_ids = list(player_tech_building_ids)
             state.player_vehicle_flags = vehicle_flags
             state.player_building_flags = building_flags
             state.scenario_category = self.category_for_campaign_index(state.level_index)
-            if i + 1 < len(GENERATOR1_CAMPAIGN_FILENAMES):
-                state.gate_target_level_id = level_id_from_filename(GENERATOR1_CAMPAIGN_FILENAMES[i + 1])
+            if campaign_profile.startswith("md-"):
+                state.gate_target_level_ids = list(
+                    GENERATOR1_MD_CAMPAIGN_TARGETS_BY_PROFILE[campaign_profile].get(state.level_id, [])
+                )
+                state.gate_target_level_id = state.gate_target_level_ids[0] if state.gate_target_level_ids else 0
+            elif i + 1 < len(filenames):
+                state.gate_target_level_id = level_id_from_filename(filenames[i + 1])
             else:
                 state.gate_target_level_id = 0
             levels.append(self._generate(state, filename))
             vehicle_flags = state.player_vehicle_flags
             building_flags = state.player_building_flags
         return GeneratedCampaign(seed=seed, levels=levels)
+
+    @staticmethod
+    def _normalize_campaign_profile(campaign_profile: str) -> str:
+        profile = campaign_profile.strip().lower()
+        if profile not in GENERATOR1_CAMPAIGN_PROFILES:
+            choices = ", ".join(GENERATOR1_CAMPAIGN_PROFILES)
+            raise ValueError(f"Unknown Generator1 campaign profile '{campaign_profile}'. Choose one of: {choices}.")
+        return profile
+
+    @staticmethod
+    def _campaign_filenames(campaign_profile: str) -> tuple[str, ...]:
+        if campaign_profile == "original":
+            return tuple(GENERATOR1_CAMPAIGN_FILENAMES)
+        return tuple(f"L{level_id:02d}{level_id:02d}.ldf" for level_id in GENERATOR1_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE[campaign_profile])
+
+    @staticmethod
+    def _profile_player_faction(campaign_profile: str) -> int:
+        if campaign_profile == "md-ghorkov":
+            return FACTION_GHORKOVS
+        if campaign_profile == "md-taerkasten":
+            return FACTION_TAERKASTEN
+        return FACTION_PLAYER
+
+    @staticmethod
+    def _profile_vehicles(campaign_profile: str) -> dict[int, list[int]]:
+        source = METROPOLIS_DAWN_VEHICLES_BY_FACTION if campaign_profile.startswith("md-") else VEHICLES_BY_FACTION
+        return {faction: list(vehicles) for faction, vehicles in source.items()}
+
+    @staticmethod
+    def _profile_buildings(campaign_profile: str) -> dict[int, list[int]]:
+        source = METROPOLIS_DAWN_BUILDINGS_BY_FACTION if campaign_profile.startswith("md-") else BUILDINGS_BY_FACTION
+        return {faction: list(buildings) for faction, buildings in source.items()}
+
+    def _player_tech_vehicle_ids(self, campaign_profile: str) -> list[int]:
+        player_faction = self._profile_player_faction(campaign_profile)
+        vehicles = self._profile_vehicles(campaign_profile).get(player_faction, [])
+        if player_faction == FACTION_PLAYER:
+            return [vehicle for vehicle in vehicles if vehicle != 9]
+        return list(vehicles)
+
+    def _player_tech_building_ids(self, campaign_profile: str) -> list[int]:
+        player_faction = self._profile_player_faction(campaign_profile)
+        return list(self._profile_buildings(campaign_profile).get(player_faction, []))
+
+    def _apply_campaign_profile(self, state: _State, campaign_profile: str) -> None:
+        state.campaign_profile = campaign_profile
+        state.player_faction = self._profile_player_faction(campaign_profile)
+        state.vehicles_by_faction = self._profile_vehicles(campaign_profile)
+        state.buildings_by_faction = self._profile_buildings(campaign_profile)
+        if campaign_profile.startswith("md-"):
+            state.host_vehicle_by_faction = dict(METROPOLIS_DAWN_HOST_VEHICLE_BY_FACTION)
 
     def generate_custom(self, options: Generator1CustomOptions) -> GeneratedLevel:
         seed = self._normalize_seed(options.seed)
@@ -292,6 +382,7 @@ class Generator1:
     def _generate(self, state: _State, filename: str, apply_scenario: bool = True) -> GeneratedLevel:
         if apply_scenario:
             self._apply_scenario(state)
+        self._assign_player_host_vehicle(state)
         if state.width <= 0 or state.height <= 0:
             self._choose_map_size(state)
         self._generate_height_map(state)
@@ -322,7 +413,7 @@ class Generator1:
         )
 
     def _apply_custom_options(self, state: _State, options: Generator1CustomOptions) -> None:
-        state.faction_enables[FACTION_PLAYER] = True
+        state.faction_enables[state.player_faction] = True
         state.gate_target_level_id = max(0, int(options.gate_target_level_id))
         state.gate_key_count_override = _clamp_optional(options.gate_key_count, 0, 16)
         state.win_movie = bool(options.win_movie)
@@ -400,7 +491,7 @@ class Generator1:
         )
 
     def _apply_scenario(self, state: _State) -> None:
-        state.faction_enables[FACTION_PLAYER] = True
+        state.faction_enables[state.player_faction] = True
         if state.scenario_category:
             self._apply_category(state)
             return
@@ -435,7 +526,7 @@ class Generator1:
         category = max(1, min(12, state.scenario_category))
         state.scenario_category = category
         state.faction_enables = [False] * 8
-        state.faction_enables[FACTION_PLAYER] = True
+        state.faction_enables[state.player_faction] = True
         state.superitem_flags = [False, False]
         match category:
             case 1:
@@ -483,26 +574,53 @@ class Generator1:
         state.min_width, state.max_width, state.min_height, state.max_height = CATEGORY_DIM_RANGES[category]
         state.player_energy = int(CATEGORY_ENERGY_PARAMS[category]["player"])
         self._assign_slot_energies(state)
-        if category in (2, 3, 4):
-            state.ai_host_vehicle_id[FACTION_GHORKOVS] = 59
-        elif category in (5, 6, 7, 10, 11, 12):
-            state.ai_host_vehicle_id[FACTION_GHORKOVS] = 57
+        ghorkov_enemy = self._enemy_faction(state, FACTION_GHORKOVS)
+        if ghorkov_enemy == FACTION_GHORKOVS:
+            if category in (2, 3, 4):
+                state.ai_host_vehicle_id[ghorkov_enemy] = 59
+            elif category in (5, 6, 7, 10, 11, 12):
+                state.ai_host_vehicle_id[ghorkov_enemy] = 57
 
-    @staticmethod
-    def _set_presence_slots(state: _State, faction: int, count: int) -> None:
+    def _set_presence_slots(self, state: _State, faction: int, count: int) -> None:
+        faction = self._enemy_faction(state, faction)
         state.faction_enables[faction] = True
         for slot in range(max(0, min(3, count))):
             state.ai_slot_present[faction][slot] = True
 
     def _assign_slot_energies(self, state: _State) -> None:
         params = CATEGORY_ENERGY_PARAMS.get(state.scenario_category, {})
-        for faction in range(2, 8):
-            if faction not in params:
+        for source_faction in range(1, 8):
+            if source_faction not in params:
                 continue
-            base_k, range_k, scale = params[faction]
+            faction = self._enemy_faction(state, source_faction)
+            if faction == state.player_faction:
+                continue
+            base_k, range_k, scale = params[source_faction]
             for slot in range(3):
                 if state.ai_slot_present[faction][slot]:
                     state.ai_slot_energy[faction][slot] = scale * (state.rng.rand_mod(range_k) + base_k)
+
+    @staticmethod
+    def _enemy_faction(state: _State, faction: int) -> int:
+        if faction == state.player_faction and state.player_faction != FACTION_PLAYER:
+            return FACTION_PLAYER
+        return faction
+
+    @staticmethod
+    def _enemy_factions(state: _State) -> list[int]:
+        return [faction for faction in range(1, 8) if faction != state.player_faction]
+
+    @staticmethod
+    def _assign_player_host_vehicle(state: _State) -> None:
+        if not state.campaign_profile.startswith("md-"):
+            return
+        robos = METROPOLIS_DAWN_PLAYER_ROBOS_BY_FACTION.get(state.player_faction, [])
+        if not robos:
+            return
+        if state.player_faction == FACTION_GHORKOVS and len(robos) > 1:
+            state.player_host_vehicle_id = GENERATOR1_MD_GHORKOV_PLAYER_ROBO_BY_LEVEL.get(state.level_id, robos[1])
+        else:
+            state.player_host_vehicle_id = robos[0]
 
     def _choose_map_size(self, state: _State) -> None:
         state.width = state.rng.rand_range(state.min_width, state.max_width)
@@ -543,7 +661,9 @@ class Generator1:
         state.maps["typ"] = rows
 
     def _init_own_map(self, state: _State) -> None:
-        owners = [0, FACTION_PLAYER] + [faction for faction in range(2, 8) if state.faction_enables[faction]]
+        owners = [0, state.player_faction] + [
+            faction for faction in self._enemy_factions(state) if state.faction_enables[faction]
+        ]
         rows = [[0 for _ in range(state.width)] for _ in range(state.height)]
         for y in range(1, state.height - 1):
             for x in range(1, state.width - 1):
@@ -556,12 +676,12 @@ class Generator1:
         state.base_x, state.base_y = x, y
         state.set("typ", x, y, TYP_PLAYER_BASE)
         state.set("blg", x, y, BLG_PLAYER_BASE)
-        state.set("own", x, y, FACTION_PLAYER)
+        state.set("own", x, y, state.player_faction)
         self._reserve_sector(state, x, y)
 
     def _place_hosts_and_ambient(self, state: _State) -> None:
         self._place_player_host(state)
-        for faction in range(2, 8):
+        for faction in self._enemy_factions(state):
             for slot in range(3):
                 if state.ai_slot_present[faction][slot]:
                     self._place_ai_host(state, faction, slot)
@@ -573,7 +693,9 @@ class Generator1:
                 continue
             x, y = sector
             owner = self._pick_present_faction(state)
-            candidates = BUILDINGS_BY_FACTION.get(owner) or BUILDINGS_BY_FACTION[FACTION_PLAYER]
+            candidates = state.buildings_by_faction.get(owner) or []
+            if not candidates:
+                continue
             building = state.rng.choice(candidates)
             state.set("blg", x, y, building)
             state.set("typ", x, y, BUILDING_TYP_BY_ID.get(building, state.get("typ", x, y)))
@@ -586,8 +708,8 @@ class Generator1:
         if state.force_player_base_model:
             building = 64
         else:
-            building = state.rng.choice(HOST_BUILDING_BY_FACTION[FACTION_PLAYER])
-        self._write_host_cell(state, x, y, FACTION_PLAYER, building)
+            building = state.rng.choice(HOST_BUILDING_BY_FACTION.get(state.player_faction, HOST_BUILDING_BY_FACTION[FACTION_PLAYER]))
+        self._write_host_cell(state, x, y, state.player_faction, building)
 
     def _place_ai_host(self, state: _State, faction: int, slot: int) -> None:
         sector = self._find_empty_sector(state, avoid=(state.base_x, state.base_y))
@@ -628,7 +750,9 @@ class Generator1:
         return state.interior(x, y) and state.get("blg", x, y) == 0 and (x, y) not in state.reserved_sectors
 
     def _pick_present_faction(self, state: _State) -> int:
-        factions = [FACTION_PLAYER] + [faction for faction in range(2, 8) if state.faction_enables[faction]]
+        factions = [state.player_faction] + [
+            faction for faction in self._enemy_factions(state) if state.faction_enables[faction]
+        ]
         return state.rng.choice(factions)
 
     def _seed_superitems(self, state: _State) -> None:
@@ -774,7 +898,9 @@ class Generator1:
         writer.property("sec_y", state.base_y)
         writer.property("closed_bp", 5)
         writer.property("opened_bp", 6)
-        writer.property("target_level", state.gate_target_level_id)
+        targets = state.gate_target_level_ids or [state.gate_target_level_id]
+        for target in targets:
+            writer.property("target_level", target)
         for x, y in state.gate_keys:
             writer.property("keysec_x", x)
             writer.property("keysec_y", y)
@@ -806,8 +932,13 @@ class Generator1:
         writer.line(";--- Robo Definitions                                    ---")
         writer.line(";------------------------------------------------------------")
         writer.line("begin_robo")
-        writer.property("owner", FACTION_PLAYER)
-        writer.property("vehicle", HOST_VEHICLE_BY_FACTION[FACTION_PLAYER])
+        writer.property("owner", state.player_faction)
+        writer.property(
+            "vehicle",
+            state.player_host_vehicle_id
+            or state.host_vehicle_by_faction.get(state.player_faction)
+            or HOST_VEHICLE_BY_FACTION[FACTION_PLAYER],
+        )
         writer.property("pos_x", sector_to_world_x(state.player_host_x))
         writer.property("pos_y", -330)
         writer.property("pos_z", sector_to_world_z(state.player_host_y))
@@ -816,7 +947,7 @@ class Generator1:
         writer.property("viewangle", 23)
         writer.end_block()
         writer.line("")
-        for faction in range(2, 8):
+        for faction in self._enemy_factions(state):
             for slot in range(3):
                 world = state.ai_slot_world[faction][slot]
                 if world:
@@ -836,7 +967,7 @@ class Generator1:
         vehicle = (
             state.ai_slot_host_vehicle_id[faction][slot]
             or state.ai_host_vehicle_id[faction]
-            or HOST_VEHICLE_BY_FACTION.get(faction, 57)
+            or state.host_vehicle_by_faction.get(faction, 57)
         )
         writer.line("begin_robo")
         writer.property("owner", faction)
@@ -894,8 +1025,8 @@ class Generator1:
         writer.line(";--- Prototype Enabling                                   ---")
         writer.line(";------------------------------------------------------------")
         if state.emit_player_enablement:
-            self._write_enable_block(writer, state, FACTION_PLAYER)
-        for faction in range(2, 8):
+            self._write_enable_block(writer, state, state.player_faction)
+        for faction in self._enemy_factions(state):
             if any(state.ai_slot_world[faction]):
                 self._write_enable_block(writer, state, faction)
 
@@ -903,7 +1034,7 @@ class Generator1:
         vehicles, buildings = self._enabled_vehicles(state, faction), self._enabled_buildings(state, faction)
         if not vehicles and not buildings:
             return
-        writer.line(f"begin_enable\t{faction}" if faction == FACTION_PLAYER else f"begin_enable {faction}")
+        writer.line(f"begin_enable\t{faction}" if faction == state.player_faction else f"begin_enable {faction}")
         for vehicle in vehicles:
             writer.line(f"\tvehicle = {vehicle}")
         for building in buildings:
@@ -914,12 +1045,16 @@ class Generator1:
     def _enabled_vehicles(self, state: _State, faction: int) -> list[int]:
         if faction in state.forced_enabled_vehicles:
             return list(state.forced_enabled_vehicles[faction])
-        if faction == FACTION_PLAYER:
-            enabled = [16, 9]
-            self._record_vehicle_flags(state, enabled)
-            for vehicle, probability in zip(VEHICLES_PLAYER_IDS, VEHICLES_PLAYER_PROBABILITIES, strict=True):
-                if state.rng.rand_mod(probability) == 0 and vehicle not in enabled:
-                    enabled.append(vehicle)
+        if faction == state.player_faction:
+            if faction == FACTION_PLAYER:
+                enabled = [16, 9]
+                self._record_vehicle_flags(state, enabled)
+                for vehicle, probability in zip(VEHICLES_PLAYER_IDS, VEHICLES_PLAYER_PROBABILITIES, strict=True):
+                    if state.rng.rand_mod(probability) == 0 and vehicle not in enabled:
+                        enabled.append(vehicle)
+            else:
+                candidates = state.vehicles_by_faction.get(faction, [])
+                enabled = [vehicle for vehicle in candidates if state.rng.rand_mod(3) == 0] or candidates[:1]
             self._record_vehicle_flags(state, enabled)
             return enabled
         if faction == FACTION_TUTOR:
@@ -932,35 +1067,40 @@ class Generator1:
                 enabled.append(72)
             enabled.append(74)
             return enabled
-        candidates = VEHICLES_BY_FACTION.get(faction, [])
+        candidates = state.vehicles_by_faction.get(faction, [])
         return [vehicle for vehicle in candidates if state.rng.rand_mod(3) == 0] or candidates[:1]
 
     def _enabled_buildings(self, state: _State, faction: int) -> list[int]:
         if faction in state.forced_enabled_buildings:
             return list(state.forced_enabled_buildings[faction])
-        if faction == FACTION_PLAYER:
-            enabled = [
-                building for building, probability in zip(BUILDINGS_PLAYER_IDS, BUILDINGS_PLAYER_PROBABILITIES, strict=True)
-                if state.rng.rand_mod(probability) == 0
-            ]
+        if faction == state.player_faction:
+            if faction == FACTION_PLAYER:
+                enabled = [
+                    building
+                    for building, probability in zip(BUILDINGS_PLAYER_IDS, BUILDINGS_PLAYER_PROBABILITIES, strict=True)
+                    if state.rng.rand_mod(probability) == 0
+                ]
+            else:
+                candidates = state.buildings_by_faction.get(faction, [])
+                enabled = [building for building in candidates if state.rng.rand_mod(3) == 0] or candidates[:1]
             self._record_building_flags(state, enabled)
             return enabled
         if faction == FACTION_TUTOR:
             return []
-        candidates = BUILDINGS_BY_FACTION.get(faction, [])
+        candidates = state.buildings_by_faction.get(faction, [])
         return [building for building in candidates if state.rng.rand_mod(3) == 0] or candidates[:1]
 
     @staticmethod
     def _record_vehicle_flags(state: _State, vehicles: list[int]) -> None:
         for vehicle in vehicles:
-            if vehicle in GENERATOR1_PLAYER_TECH_VEHICLE_IDS:
-                state.player_vehicle_flags[GENERATOR1_PLAYER_TECH_VEHICLE_IDS.index(vehicle)] = True
+            if vehicle in state.player_tech_vehicle_ids:
+                state.player_vehicle_flags[state.player_tech_vehicle_ids.index(vehicle)] = True
 
     @staticmethod
     def _record_building_flags(state: _State, buildings: list[int]) -> None:
         for building in buildings:
-            if building in GENERATOR1_PLAYER_TECH_BUILDING_IDS:
-                state.player_building_flags[GENERATOR1_PLAYER_TECH_BUILDING_IDS.index(building)] = True
+            if building in state.player_tech_building_ids:
+                state.player_building_flags[state.player_tech_building_ids.index(building)] = True
 
     def _write_tech_upgrades(self, writer: LDFWriter, state: _State) -> None:
         writer.line(";------------------------------------------------------------")
@@ -1006,11 +1146,11 @@ class Generator1:
         elif family == 2:
             vehicle = self._unlock_next_vehicle(state)
             writer.property("modify_vehicle", vehicle)
-            writer.property("enable", FACTION_PLAYER)
+            writer.property("enable", state.player_faction)
         else:
             building = self._unlock_next_building(state)
             writer.property("modify_building", building)
-            writer.property("enable", FACTION_PLAYER)
+            writer.property("enable", state.player_faction)
         writer.line("end_action")
         writer.property("mb_status", "unknown")
         writer.end_block()
@@ -1018,24 +1158,27 @@ class Generator1:
 
     def _choose_enabled_player_vehicle(self, state: _State) -> int:
         enabled = [
-            vehicle for vehicle, flag in zip(GENERATOR1_PLAYER_TECH_VEHICLE_IDS, state.player_vehicle_flags, strict=True)
+            vehicle for vehicle, flag in zip(state.player_tech_vehicle_ids, state.player_vehicle_flags, strict=True)
             if flag
         ]
-        return state.rng.choice(enabled or [16])
+        fallback = state.player_tech_vehicle_ids[:1] or [16]
+        return state.rng.choice(enabled or fallback)
 
     def _unlock_next_vehicle(self, state: _State) -> int:
         for i, flag in enumerate(state.player_vehicle_flags):
             if not flag:
                 state.player_vehicle_flags[i] = True
-                return GENERATOR1_PLAYER_TECH_VEHICLE_IDS[i]
+                return state.player_tech_vehicle_ids[i]
         return self._choose_enabled_player_vehicle(state)
 
     def _unlock_next_building(self, state: _State) -> int:
         for i, flag in enumerate(state.player_building_flags):
             if not flag:
                 state.player_building_flags[i] = True
-                return GENERATOR1_PLAYER_TECH_BUILDING_IDS[i]
-        return GENERATOR1_PLAYER_TECH_BUILDING_IDS[state.rng.rand_mod(len(GENERATOR1_PLAYER_TECH_BUILDING_IDS))]
+                return state.player_tech_building_ids[i]
+        if not state.player_tech_building_ids:
+            return 0
+        return state.player_tech_building_ids[state.rng.rand_mod(len(state.player_tech_building_ids))]
 
     def _write_maps(self, writer: LDFWriter, state: _State) -> None:
         writer.line(";------------------------------------------------------------")

@@ -191,7 +191,7 @@ class GuiHelperTests(unittest.TestCase):
             {1074: FakeVar(True), 1052: FakeVar(True)},
         )
         self.assertEqual(faction, FACTION_MYKONIANS)
-        self.assertEqual(vehicles, [65])
+        self.assertEqual(vehicles, [68])
         self.assertEqual(buildings, [72])
 
         vehicles, buildings, faction = _unit_enable_values(147, {1151: FakeVar(True)})
@@ -225,7 +225,7 @@ class GuiHelperTests(unittest.TestCase):
         )
         state.host_present[FACTION_GHORKOVS] = [True, True, False]
         state.host_energy[FACTION_GHORKOVS] = [2000, 2500, 1500]
-        state.ghorkov_host_types = ["Tarantul 1", "Tarantul 2", "Tarantul 1"]
+        state.ghorkov_host_types = ["Turantul I", "Turantul II", "Turantul I"]
         state.faction_random_build_options[FACTION_PLAYER] = False
         state.faction_random_build_options[FACTION_GHORKOVS] = False
         state.enabled_vehicles[FACTION_PLAYER] = {1, 16}

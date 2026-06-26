@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from .constants import GENERATOR1_CAMPAIGN_PROFILES
 from .generator1 import Generator1
 from .generator2 import Generator2
 
@@ -25,6 +26,12 @@ def build_parser() -> argparse.ArgumentParser:
     gen1_campaign.add_argument("--seed", type=int, default=0)
     gen1_campaign.add_argument("--difficulty", type=int, default=5)
     gen1_campaign.add_argument("--strict-parity", action="store_true", help="Disable improved tileset filtering")
+    gen1_campaign.add_argument(
+        "--campaign-profile",
+        choices=GENERATOR1_CAMPAIGN_PROFILES,
+        default="original",
+        help="Generator1 campaign roster/profile to generate",
+    )
     gen1_campaign.add_argument("--output-dir", required=True)
 
     gen2 = subparsers.add_parser("gen2", help="PHP-derived Generator2")
@@ -55,7 +62,12 @@ def main(argv: list[str] | None = None) -> int:
             path = level.write(args.output)
             print(f"Wrote {path}")
             return 0
-        campaign = generator.generate_campaign(seed=args.seed, difficulty=args.difficulty, improved=improved)
+        campaign = generator.generate_campaign(
+            seed=args.seed,
+            difficulty=args.difficulty,
+            improved=improved,
+            campaign_profile=args.campaign_profile,
+        )
         written = campaign.write(args.output_dir)
         print(f"Wrote {len(written)} Generator1 levels to {Path(args.output_dir)}")
         return 0

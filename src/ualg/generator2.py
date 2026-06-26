@@ -1,4 +1,4 @@
-"""Python port of the PHP-derived former Generator3, exposed as Generator2."""
+"""Python port of the PHP-derived exposed as Generator2."""
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ class _Level:
 
 
 class Generator2:
-    """Former PHP/Godot Generator3 implementation, renamed to Generator2."""
+    """PHP Generator2 implementation."""
 
     campaign_level_ids = tuple(GENERATOR2_CAMPAIGN_LEVEL_IDS)
 

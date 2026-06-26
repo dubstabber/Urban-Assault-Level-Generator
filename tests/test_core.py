@@ -12,16 +12,25 @@ SRC = ROOT / "src"
 sys.path.insert(0, str(SRC))
 
 from ualg.constants import (
+    BUILDINGS_BY_FACTION,
+    FACTION_BLACK_SECT,
     FACTION_PLAYER,
     FACTION_GHORKOVS,
+    FACTION_MYKONIANS,
+    FACTION_SULGOGARS,
+    FACTION_TAERKASTEN,
+    FACTION_TUTOR,
     GENERATOR1_CAMPAIGN_FILENAMES,
+    GENERATOR1_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE,
+    GENERATOR1_MD_CAMPAIGN_TARGETS_BY_PROFILE,
     GENERATOR2_CAMPAIGN_LEVEL_IDS,
     GENERATOR2_SET_LIST,
+    VEHICLES_BY_FACTION,
     TYP_GATE_CLOSED_1,
     TYP_GATE_CLOSED_2,
     TYP_MAP_INTERIOR_LOOKUP,
 )
-from ualg.data import tileset_compatibility
+from ualg.data import UA_ORIGINAL_PROFILE, tileset_compatibility, ua_faction_buildings, ua_faction_units
 from ualg.generator1 import Generator1, Generator1CustomOptions
 from ualg.generator2 import Generator2
 from ualg.ldf import parse_maps
@@ -65,6 +74,77 @@ class CoreTests(unittest.TestCase):
         self.assertIn("win_movie", idx43)
         self.assertIn("lose_movie", idx43)
         self.assertNotIn("begin_enable\t1", "\n".join(level.text for level in campaign.levels))
+
+    def test_generator1_rosters_follow_uadata_original(self) -> None:
+        units = ua_faction_units(UA_ORIGINAL_PROFILE)
+        buildings = ua_faction_buildings(UA_ORIGINAL_PROFILE)
+
+        for faction in (
+            FACTION_PLAYER,
+            FACTION_GHORKOVS,
+            FACTION_TAERKASTEN,
+            FACTION_MYKONIANS,
+            FACTION_SULGOGARS,
+            FACTION_TUTOR,
+        ):
+            self.assertEqual(VEHICLES_BY_FACTION[faction], units[faction])
+            self.assertEqual(BUILDINGS_BY_FACTION[faction], buildings[faction])
+
+        expected_black_units = self._dedupe(
+            units[FACTION_PLAYER]
+            + units[FACTION_SULGOGARS]
+            + units[FACTION_MYKONIANS]
+            + units[FACTION_TAERKASTEN]
+            + units[FACTION_GHORKOVS]
+        )
+        expected_black_buildings = self._dedupe(
+            buildings[FACTION_PLAYER]
+            + buildings[FACTION_SULGOGARS]
+            + buildings[FACTION_MYKONIANS]
+            + buildings[FACTION_TAERKASTEN]
+            + buildings[FACTION_BLACK_SECT]
+            + buildings[FACTION_GHORKOVS]
+        )
+        self.assertEqual(VEHICLES_BY_FACTION[FACTION_BLACK_SECT], expected_black_units)
+        self.assertEqual(BUILDINGS_BY_FACTION[FACTION_BLACK_SECT], expected_black_buildings)
+
+    def test_generator1_metropolis_dawn_ghorkov_campaign_profile(self) -> None:
+        campaign = Generator1().generate_campaign(seed=1234, campaign_profile="md-ghorkov")
+        expected_filenames = [
+            f"L{level_id:02d}{level_id:02d}.ldf"
+            for level_id in GENERATOR1_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE["md-ghorkov"]
+        ]
+
+        self.assertEqual([level.filename for level in campaign.levels], expected_filenames)
+        self.assertEqual(len(campaign.levels), 16)
+        by_id = {level.level_id: level for level in campaign.levels}
+        for level_id, targets in GENERATOR1_MD_CAMPAIGN_TARGETS_BY_PROFILE["md-ghorkov"].items():
+            self.assertEqual(self._gate_targets(by_id[level_id].text), targets)
+
+        turantul_i = self._robo_owner_vehicles(by_id[35].text)
+        turantul_ii = self._robo_owner_vehicles(by_id[37].text)
+        self.assertIn((6, 176), turantul_i)
+        self.assertIn((6, 177), turantul_ii)
+        self.assertEqual(sum(1 for owner, _vehicle in turantul_i if owner == 6), 1)
+        self.assertIn((1, 56), turantul_i)
+
+    def test_generator1_metropolis_dawn_taerkasten_campaign_profile(self) -> None:
+        campaign = Generator1().generate_campaign(seed=1234, campaign_profile="md-taerkasten")
+        expected_filenames = [
+            f"L{level_id:02d}{level_id:02d}.ldf"
+            for level_id in GENERATOR1_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE["md-taerkasten"]
+        ]
+
+        self.assertEqual([level.filename for level in campaign.levels], expected_filenames)
+        self.assertEqual(len(campaign.levels), 15)
+        by_id = {level.level_id: level for level in campaign.levels}
+        for level_id, targets in GENERATOR1_MD_CAMPAIGN_TARGETS_BY_PROFILE["md-taerkasten"].items():
+            self.assertEqual(self._gate_targets(by_id[level_id].text), targets)
+
+        owner_vehicles = self._robo_owner_vehicles(by_id[78].text)
+        self.assertIn((4, 178), owner_vehicles)
+        self.assertEqual(sum(1 for owner, _vehicle in owner_vehicles if owner == 4), 1)
+        self.assertIn((1, 56), self._robo_owner_vehicles(by_id[45].text))
 
     def test_generator1_typ_map_policy(self) -> None:
         improved = Generator1().generate_single(seed=424242, difficulty=5, skill=6)
@@ -264,6 +344,7 @@ class CoreTests(unittest.TestCase):
     def test_cli_writes_files(self) -> None:
         gen1_output = ROOT / ".cli_smoke_gen1_single.ldf"
         gen1_campaign = ROOT / ".cli_smoke_gen1_campaign"
+        gen1_md_campaign = ROOT / ".cli_smoke_gen1_md_campaign"
         gen2_output = ROOT / ".cli_smoke_gen2_single.ldf"
         env = {**os.environ, "PYTHONPATH": str(SRC), "PYTHONDONTWRITEBYTECODE": "1"}
         try:
@@ -291,6 +372,33 @@ class CoreTests(unittest.TestCase):
             self.assertEqual(len(list(gen1_campaign.glob("*.ldf"))), len(GENERATOR1_CAMPAIGN_FILENAMES))
 
             result = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    "-m",
+                    "ualg.cli",
+                    "gen1",
+                    "campaign",
+                    "--seed",
+                    "1234",
+                    "--campaign-profile",
+                    "md-ghorkov",
+                    "--output-dir",
+                    str(gen1_md_campaign),
+                ],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                len(list(gen1_md_campaign.glob("*.ldf"))),
+                len(GENERATOR1_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE["md-ghorkov"]),
+            )
+
+            result = subprocess.run(
                 [sys.executable, "-B", "-m", "ualg.cli", "gen2", "single", "--seed", "1234", "--level-id", "1", "--output", str(gen2_output)],
                 cwd=ROOT,
                 env=env,
@@ -307,6 +415,8 @@ class CoreTests(unittest.TestCase):
                     output.unlink()
             if gen1_campaign.exists():
                 shutil.rmtree(gen1_campaign)
+            if gen1_md_campaign.exists():
+                shutil.rmtree(gen1_md_campaign)
 
     @staticmethod
     def _blocks(text: str, block_name: str) -> list[list[str]]:
@@ -352,6 +462,25 @@ class CoreTests(unittest.TestCase):
             if key == name:
                 values.append(value)
         return values
+
+    def _robo_owner_vehicles(self, text: str) -> list[tuple[int, int]]:
+        result: list[tuple[int, int]] = []
+        for block in self._blocks(text, "begin_robo"):
+            owners = self._property_values(block, "owner")
+            vehicles = self._property_values(block, "vehicle")
+            if owners and vehicles:
+                result.append((int(owners[0]), int(vehicles[0])))
+        return result
+
+    def _gate_targets(self, text: str) -> list[int]:
+        result: list[int] = []
+        for block in self._blocks(text, "begin_gate"):
+            result.extend(int(value) for value in self._property_values(block, "target_level"))
+        return result
+
+    @staticmethod
+    def _dedupe(values: list[int]) -> list[int]:
+        return list(dict.fromkeys(values))
 
     def _assert_crlf_only(self, text: str) -> None:
         self.assertEqual(text.count("\n"), text.count("\r\n"))
