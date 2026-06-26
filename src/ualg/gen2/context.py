@@ -22,6 +22,7 @@ class _Level:
     rng: MSVCRTRandom
     seed: int
     campaign_profile: str = "original"
+    zero_enemy_station_delays: bool = False
     mission_briefing_map: str = "MB_15.IFF"
     mission_debriefing_map: str = "DB_15.IFF"
     player_faction: str = "res"

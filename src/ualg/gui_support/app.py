@@ -65,6 +65,9 @@ class Generator1GUI:
         self.generator2_seed_var = tk.StringVar(value="")
         self.generator2_campaign_seed_var = tk.StringVar(value="")
         self.generator2_campaign_profile_var = tk.StringVar(value="original")
+        self.generator2_zero_enemy_station_delays_var = tk.BooleanVar(
+            value=settings.generator2_zero_enemy_station_delays
+        )
         self.building_scripts_var = tk.BooleanVar(value=settings.use_building_scripts)
         self.status_var = tk.StringVar(value="Ready.")
 
@@ -181,8 +184,16 @@ class Generator1GUI:
     def _build_generator2_tab(self, outer: tk.Frame) -> None:
         outer.columnconfigure(0, weight=1)
 
+        options = tk.LabelFrame(outer, text="Options", padx=8, pady=8)
+        options.grid(row=0, column=0, sticky="ew")
+        tk.Checkbutton(
+            options,
+            text="Set enemy host station delays to 0",
+            variable=self.generator2_zero_enemy_station_delays_var,
+        ).grid(row=0, column=0, sticky="w")
+
         single = tk.LabelFrame(outer, text="Single Level", padx=8, pady=8)
-        single.grid(row=0, column=0, sticky="ew")
+        single.grid(row=1, column=0, sticky="ew", pady=(8, 0))
         single.columnconfigure(1, weight=1)
 
         tk.Label(single, text="Level ID:", anchor="w").grid(row=0, column=0, sticky="w", padx=(0, 6), pady=2)
@@ -213,7 +224,7 @@ class Generator1GUI:
         )
 
         campaign = tk.LabelFrame(outer, text="Campaign", padx=8, pady=8)
-        campaign.grid(row=1, column=0, sticky="ew", pady=(8, 0))
+        campaign.grid(row=2, column=0, sticky="ew", pady=(8, 0))
         campaign.columnconfigure(1, weight=1)
 
         tk.Label(campaign, text="Seed (blank for random):", anchor="w").grid(
@@ -386,7 +397,12 @@ class Generator1GUI:
         )
         if target is None:
             return
-        self._generate_generator2_single(target, seed=seed, level_id=level_id)
+        self._generate_generator2_single(
+            target,
+            seed=seed,
+            level_id=level_id,
+            zero_enemy_station_delays=self.generator2_zero_enemy_station_delays_var.get(),
+        )
 
     def _make_generator2_campaign(self) -> None:
         seed = self._parse_optional_seed_entry(self.generator2_campaign_seed_var, "Generator2 Campaign")
@@ -396,7 +412,12 @@ class Generator1GUI:
         if directory is None:
             return
         campaign_profile = self.generator2_campaign_profile_var.get().strip() or "original"
-        self._generate_generator2_campaign(directory, seed=seed, campaign_profile=campaign_profile)
+        self._generate_generator2_campaign(
+            directory,
+            seed=seed,
+            campaign_profile=campaign_profile,
+            zero_enemy_station_delays=self.generator2_zero_enemy_station_delays_var.get(),
+        )
 
     def _generate_single(self, target: Path, seed: int, difficulty: int, skill: int, improved: bool) -> None:
         self._run_generation_workflow(
@@ -437,24 +458,46 @@ class Generator1GUI:
             success_lines=lambda result: self._campaign_created_lines(result, "Generator1"),
         )
 
-    def _generate_generator2_single(self, target: Path, seed: int, level_id: int) -> None:
+    def _generate_generator2_single(
+        self,
+        target: Path,
+        seed: int,
+        level_id: int,
+        zero_enemy_station_delays: bool,
+    ) -> None:
         self._run_generation_workflow(
             start_status="Generating Generator2 level...",
             failure_status="Generator2 generation failed.",
             error_title="Generation Failed",
             success_title="Generator2 Level Created",
-            action=lambda: generate_generator2_single(target, seed=seed, level_id=level_id),
+            action=lambda: generate_generator2_single(
+                target,
+                seed=seed,
+                level_id=level_id,
+                zero_enemy_station_delays=zero_enemy_station_delays,
+            ),
             success_status=lambda result: f"Wrote {result.written}",
             success_lines=self._generator2_level_created_lines,
         )
 
-    def _generate_generator2_campaign(self, directory: Path, seed: int, campaign_profile: str) -> None:
+    def _generate_generator2_campaign(
+        self,
+        directory: Path,
+        seed: int,
+        campaign_profile: str,
+        zero_enemy_station_delays: bool,
+    ) -> None:
         self._run_generation_workflow(
             start_status="Generating Generator2 campaign...",
             failure_status="Generator2 campaign generation failed.",
             error_title="Campaign Generation Failed",
             success_title="Generator2 Campaign Created",
-            action=lambda: generate_generator2_campaign(directory, seed=seed, campaign_profile=campaign_profile),
+            action=lambda: generate_generator2_campaign(
+                directory,
+                seed=seed,
+                campaign_profile=campaign_profile,
+                zero_enemy_station_delays=zero_enemy_station_delays,
+            ),
             success_status=lambda result: f"Wrote {len(result.written)} Generator2 campaign levels.",
             success_lines=lambda result: self._campaign_created_lines(result, "Generator2"),
         )
@@ -676,6 +719,7 @@ class Generator1GUI:
             use_building_scripts=self.building_scripts_var.get(),
             generator2_single_level_file=self.generator2_single_file_var.get().strip(),
             generator2_campaign_directory=self.generator2_campaign_dir_var.get().strip(),
+            generator2_zero_enemy_station_delays=self.generator2_zero_enemy_station_delays_var.get(),
         )
 
     def _show_credits(self) -> None:

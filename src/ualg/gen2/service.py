@@ -26,19 +26,37 @@ class Generator2:
         self.placement = Generator2PlacementPlanner(self.map_builder)
         self.renderer = Generator2Renderer(self.map_builder)
 
-    def generate_single(self, seed: int = 0, level_id: int = 1) -> GeneratedLevel:
+    def generate_single(
+        self,
+        seed: int = 0,
+        level_id: int = 1,
+        *,
+        zero_enemy_station_delays: bool = False,
+    ) -> GeneratedLevel:
         if level_id not in self.profiles.original_level_ids():
             raise ValueError(f"unknown Generator2 level id: {level_id}")
         seed = self._normalize_seed(seed)
         rng = MSVCRTRandom(seed)
-        return self._generate_level(level_id, rng, seed)
+        return self._generate_level(level_id, rng, seed, zero_enemy_station_delays=zero_enemy_station_delays)
 
-    def generate_campaign(self, seed: int = 0, campaign_profile: str = "original") -> GeneratedCampaign:
+    def generate_campaign(
+        self,
+        seed: int = 0,
+        campaign_profile: str = "original",
+        *,
+        zero_enemy_station_delays: bool = False,
+    ) -> GeneratedCampaign:
         campaign_profile = self.profiles.normalize_campaign_profile(campaign_profile)
         seed = self._normalize_seed(seed)
         rng = MSVCRTRandom(seed)
         levels = [
-            self._generate_level(level_id, rng, seed, campaign_profile=campaign_profile)
+            self._generate_level(
+                level_id,
+                rng,
+                seed,
+                campaign_profile=campaign_profile,
+                zero_enemy_station_delays=zero_enemy_station_delays,
+            )
             for level_id in self.profiles.campaign_level_ids(campaign_profile)
         ]
         return GeneratedCampaign(seed=seed, levels=levels)
@@ -50,8 +68,14 @@ class Generator2:
         seed: int,
         *,
         campaign_profile: str = "original",
+        zero_enemy_station_delays: bool = False,
     ) -> GeneratedLevel:
-        level = _Level(level_id=level_id, rng=rng, seed=seed)
+        level = _Level(
+            level_id=level_id,
+            rng=rng,
+            seed=seed,
+            zero_enemy_station_delays=zero_enemy_station_delays,
+        )
         self.profiles.apply_campaign_profile(level, campaign_profile)
         self.placement._choose_map_size(level)
         level.tileset = rng.rand_range(1, 6)

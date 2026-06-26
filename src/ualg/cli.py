@@ -39,6 +39,11 @@ def build_parser() -> argparse.ArgumentParser:
     gen2_single = gen2_sub.add_parser("single", help="Generate one Generator2 level")
     gen2_single.add_argument("--seed", type=int, default=0)
     gen2_single.add_argument("--level-id", type=int, default=1)
+    gen2_single.add_argument(
+        "--zero-enemy-station-delays",
+        action="store_true",
+        help="Set all enemy host station *_delay values to 0",
+    )
     gen2_single.add_argument("--output", required=True)
     gen2_campaign = gen2_sub.add_parser("campaign", help="Generate the 42-level Generator2 campaign")
     gen2_campaign.add_argument("--seed", type=int, default=0)
@@ -47,6 +52,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=GENERATOR2_CAMPAIGN_PROFILES,
         default="original",
         help="Generator2 campaign roster/profile to generate",
+    )
+    gen2_campaign.add_argument(
+        "--zero-enemy-station-delays",
+        action="store_true",
+        help="Set all enemy host station *_delay values to 0",
     )
     gen2_campaign.add_argument("--output-dir", required=True)
 
@@ -80,11 +90,19 @@ def main(argv: list[str] | None = None) -> int:
 
     generator = Generator2()
     if args.mode == "single":
-        level = generator.generate_single(seed=args.seed, level_id=args.level_id)
+        level = generator.generate_single(
+            seed=args.seed,
+            level_id=args.level_id,
+            zero_enemy_station_delays=args.zero_enemy_station_delays,
+        )
         path = level.write(args.output)
         print(f"Wrote {path}")
         return 0
-    campaign = generator.generate_campaign(seed=args.seed, campaign_profile=args.campaign_profile)
+    campaign = generator.generate_campaign(
+        seed=args.seed,
+        campaign_profile=args.campaign_profile,
+        zero_enemy_station_delays=args.zero_enemy_station_delays,
+    )
     written = campaign.write(args.output_dir)
     print(f"Wrote {len(written)} Generator2 levels to {Path(args.output_dir)}")
     return 0

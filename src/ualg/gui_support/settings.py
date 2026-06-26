@@ -24,6 +24,7 @@ class GuiSettings:
     use_building_scripts: bool = True
     generator2_single_level_file: str = ""
     generator2_campaign_directory: str = ""
+    generator2_zero_enemy_station_delays: bool = False
 
 
 
@@ -46,6 +47,9 @@ def load_settings(path: str | Path | None = None) -> GuiSettings:
         use_building_scripts=_truthy(_get_option(parser, RLG_SECTION, "Data3-DO NOT CHANGE", default="1")),
         generator2_single_level_file=_get_option(parser, GENERATOR2_SECTION, "SingleLevelFile"),
         generator2_campaign_directory=_get_option(parser, GENERATOR2_SECTION, "CampaignDirectory"),
+        generator2_zero_enemy_station_delays=_truthy(
+            _get_option(parser, GENERATOR2_SECTION, "ZeroEnemyStationDelays", default="0")
+        ),
     )
 
 
@@ -68,6 +72,7 @@ def save_settings(settings: GuiSettings, path: str | Path | None = None) -> Path
     parser[GENERATOR2_SECTION] = {
         "SingleLevelFile": settings.generator2_single_level_file,
         "CampaignDirectory": settings.generator2_campaign_directory,
+        "ZeroEnemyStationDelays": "1" if settings.generator2_zero_enemy_station_delays else "0",
     }
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     with settings_path.open("w", encoding="utf-8", newline="") as handle:

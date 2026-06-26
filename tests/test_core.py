@@ -59,6 +59,18 @@ from ualg.ldf import parse_maps
 from ualg.rng import MSVCRTRandom
 
 
+GENERATOR2_ENEMY_STATION_DELAY_KEYS = (
+    "con_delay",
+    "def_delay",
+    "rec_delay",
+    "rob_delay",
+    "pow_delay",
+    "rad_delay",
+    "saf_delay",
+    "cpl_delay",
+)
+
+
 class CoreTests(unittest.TestCase):
     def test_msvcrt_rng_sequence(self) -> None:
         rng = MSVCRTRandom(1)
@@ -385,6 +397,22 @@ class CoreTests(unittest.TestCase):
         self._assert_crlf_only(first.text)
         self._assert_generator2_typ_border(first)
 
+    def test_generator2_zero_enemy_station_delays_only_changes_delay_values(self) -> None:
+        normal = Generator2().generate_single(seed=112233, level_id=1)
+        zeroed = Generator2().generate_single(seed=112233, level_id=1, zero_enemy_station_delays=True)
+
+        self.assertNotEqual(normal.text, zeroed.text)
+        self.assertEqual(self._zero_generator2_delay_values(normal.text), zeroed.text)
+        self._assert_generator2_enemy_station_delays_zero(zeroed.text)
+
+    def test_generator2_campaign_zero_enemy_station_delays(self) -> None:
+        campaign = Generator2().generate_campaign(seed=998877, zero_enemy_station_delays=True)
+
+        found_delay_block = False
+        for level in campaign.levels:
+            found_delay_block = self._assert_generator2_enemy_station_delays_zero(level.text) or found_delay_block
+        self.assertTrue(found_delay_block)
+
     def test_generator2_campaign_graph(self) -> None:
         campaign = Generator2().generate_campaign(seed=998877)
         self.assertTrue(campaign.ok)
@@ -571,7 +599,21 @@ class CoreTests(unittest.TestCase):
             )
 
             result = subprocess.run(
-                [sys.executable, "-B", "-m", "ualg.cli", "gen2", "single", "--seed", "1234", "--level-id", "1", "--output", str(gen2_output)],
+                [
+                    sys.executable,
+                    "-B",
+                    "-m",
+                    "ualg.cli",
+                    "gen2",
+                    "single",
+                    "--seed",
+                    "1234",
+                    "--level-id",
+                    "1",
+                    "--zero-enemy-station-delays",
+                    "--output",
+                    str(gen2_output),
+                ],
                 cwd=ROOT,
                 env=env,
                 text=True,
@@ -580,7 +622,9 @@ class CoreTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue(gen2_output.exists())
-            self.assertIn("begin_level", gen2_output.read_text(encoding="utf-8"))
+            gen2_text = gen2_output.read_text(encoding="utf-8")
+            self.assertIn("begin_level", gen2_text)
+            self.assertTrue(self._assert_generator2_enemy_station_delays_zero(gen2_text))
 
             result = subprocess.run(
                 [
@@ -711,6 +755,41 @@ class CoreTests(unittest.TestCase):
             self._property_values(mb_blocks[0], "name")[0],
             self._property_values(db_blocks[0], "name")[0],
         )
+
+    def _assert_generator2_enemy_station_delays_zero(self, text: str) -> bool:
+        found_delay_block = False
+        for block in self._blocks(text, "begin_robo"):
+            values: list[str] = []
+            for key in GENERATOR2_ENEMY_STATION_DELAY_KEYS:
+                values.extend(self._property_values(block, key))
+            if not values:
+                continue
+            found_delay_block = True
+            self.assertEqual(set(values), {"0"})
+        return found_delay_block
+
+    @staticmethod
+    def _zero_generator2_delay_values(text: str) -> str:
+        result: list[str] = []
+        for line in text.splitlines(keepends=True):
+            if "=" not in line:
+                result.append(line)
+                continue
+            key = line.split("=", 1)[0].strip()
+            if key not in GENERATOR2_ENEMY_STATION_DELAY_KEYS:
+                result.append(line)
+                continue
+            if line.endswith("\r\n"):
+                body = line[:-2]
+                newline = "\r\n"
+            elif line.endswith("\n"):
+                body = line[:-1]
+                newline = "\n"
+            else:
+                body = line
+                newline = ""
+            result.append(f"{body.split('=', 1)[0]}= 0{newline}")
+        return "".join(result)
 
     def _assert_metropolis_dawn_mission_maps(self, levels) -> None:
         briefing_maps = {name.lower() for name in ua_mission_briefing_maps(UA_METROPOLIS_DAWN_PROFILE)}

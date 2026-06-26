@@ -82,10 +82,20 @@ def generate_generator1_campaign(
     )
 
 
-def generate_generator2_single(target: str | Path, *, seed: int, level_id: int) -> LevelGenerationResult:
+def generate_generator2_single(
+    target: str | Path,
+    *,
+    seed: int,
+    level_id: int,
+    zero_enemy_station_delays: bool = False,
+) -> LevelGenerationResult:
     target_path = Path(target)
     backup_path = backup_existing_file(target_path)
-    level = Generator2().generate_single(seed=seed, level_id=level_id)
+    level = Generator2().generate_single(
+        seed=seed,
+        level_id=level_id,
+        zero_enemy_station_delays=zero_enemy_station_delays,
+    )
     written = level.write(target_path)
     return LevelGenerationResult(level=level, written=written, backup_path=backup_path)
 
@@ -95,10 +105,15 @@ def generate_generator2_campaign(
     *,
     seed: int,
     campaign_profile: str,
+    zero_enemy_station_delays: bool = False,
 ) -> CampaignGenerationResult:
     target_dir = Path(directory)
     backup_dir, moved = backup_campaign_ldfs(target_dir)
-    campaign = Generator2().generate_campaign(seed=seed, campaign_profile=campaign_profile)
+    campaign = Generator2().generate_campaign(
+        seed=seed,
+        campaign_profile=campaign_profile,
+        zero_enemy_station_delays=zero_enemy_station_delays,
+    )
     written = campaign.write(target_dir)
     return CampaignGenerationResult(
         campaign=campaign,

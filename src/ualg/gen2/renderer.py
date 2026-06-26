@@ -118,22 +118,26 @@ class Generator2Renderer:
                 if level.rng.rand_range(0, 1) == 0:
                     writer.property("mb_status", "unknown")
                 writer.property("con_budget", level.rng.rand_range(80, 90))
-                writer.property("con_delay", level.rng.rand_range(0, 300) * 1000)
+                writer.property("con_delay", self._enemy_station_delay(level, 0, 300))
                 writer.property("def_budget", level.rng.rand_range(70, 100))
-                writer.property("def_delay", level.rng.rand_range(0, 300) * 1000)
+                writer.property("def_delay", self._enemy_station_delay(level, 0, 300))
                 writer.property("rec_budget", level.rng.rand_range(50, 80))
-                writer.property("rec_delay", level.rng.rand_range(0, 300) * 1000)
+                writer.property("rec_delay", self._enemy_station_delay(level, 0, 300))
                 writer.property("rob_budget", level.rng.rand_range(50, 90))
-                writer.property("rob_delay", level.rng.rand_range(0, 300) * 1000)
+                writer.property("rob_delay", self._enemy_station_delay(level, 0, 300))
                 writer.property("pow_budget", level.rng.rand_range(40, 70))
-                writer.property("pow_delay", level.rng.rand_range(0, 300) * 1000)
+                writer.property("pow_delay", self._enemy_station_delay(level, 0, 300))
                 writer.property("rad_budget", level.rng.rand_range(0, 10))
-                writer.property("rad_delay", level.rng.rand_range(600, 1800) * 1000)
+                writer.property("rad_delay", self._enemy_station_delay(level, 600, 1800))
                 writer.property("saf_budget", level.rng.rand_range(50, 100))
-                writer.property("saf_delay", level.rng.rand_range(0, 300) * 1000)
+                writer.property("saf_delay", self._enemy_station_delay(level, 0, 300))
                 writer.property("cpl_budget", level.rng.rand_range(30, 50))
-                writer.property("cpl_delay", level.rng.rand_range(0, 300) * 1000)
+                writer.property("cpl_delay", self._enemy_station_delay(level, 0, 300))
                 writer.end_block()
+
+    def _enemy_station_delay(self, level: _Level, minimum: int, maximum: int) -> int:
+        delay = level.rng.rand_range(minimum, maximum) * 1000
+        return 0 if level.zero_enemy_station_delays else delay
 
     def _write_bombs(self, writer: LDFWriter, level: _Level) -> None:
         writer.line("")

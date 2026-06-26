@@ -28,6 +28,18 @@ from ualg.gui_support.workflows import (
 )
 
 
+GENERATOR2_ENEMY_STATION_DELAY_KEYS = {
+    "con_delay",
+    "def_delay",
+    "rec_delay",
+    "rob_delay",
+    "pow_delay",
+    "rad_delay",
+    "saf_delay",
+    "cpl_delay",
+}
+
+
 class FakeVar:
     def __init__(self, value: bool) -> None:
         self.value = value
@@ -60,6 +72,7 @@ class GuiHelperTests(unittest.TestCase):
             use_building_scripts=False,
             generator2_single_level_file=str(self.tmp_path / "gen2_single.ldf"),
             generator2_campaign_directory=str(self.tmp_path / "gen2_campaign"),
+            generator2_zero_enemy_station_delays=True,
         )
 
         saved = save_settings(settings, path)
@@ -94,6 +107,7 @@ class GuiHelperTests(unittest.TestCase):
         self.assertFalse(loaded.use_building_scripts)
         self.assertEqual(loaded.generator2_single_level_file, "")
         self.assertEqual(loaded.generator2_campaign_directory, "")
+        self.assertFalse(loaded.generator2_zero_enemy_station_delays)
 
     def test_load_settings_reads_generator2_paths(self) -> None:
         path = self.tmp_path / "RandomUA.ini"
@@ -103,6 +117,7 @@ class GuiHelperTests(unittest.TestCase):
                     "[Generator2]",
                     "SingleLevelFile=C:/levels/L0101.ldf",
                     "CampaignDirectory=C:/levels/gen2",
+                    "ZeroEnemyStationDelays=1",
                 ]
             ),
             encoding="utf-8",
@@ -112,6 +127,7 @@ class GuiHelperTests(unittest.TestCase):
 
         self.assertEqual(loaded.generator2_single_level_file, "C:/levels/L0101.ldf")
         self.assertEqual(loaded.generator2_campaign_directory, "C:/levels/gen2")
+        self.assertTrue(loaded.generator2_zero_enemy_station_delays)
 
     def test_backup_existing_file_copies_without_removing_source(self) -> None:
         source = self.tmp_path / "level.ldf"
@@ -177,7 +193,12 @@ class GuiHelperTests(unittest.TestCase):
         old_level = directory / "old.ldf"
         old_level.write_text("old campaign level", encoding="utf-8")
 
-        result = generate_generator2_campaign(directory, seed=998877, campaign_profile="original")
+        result = generate_generator2_campaign(
+            directory,
+            seed=998877,
+            campaign_profile="original",
+            zero_enemy_station_delays=True,
+        )
 
         self.assertEqual(result.directory, directory)
         self.assertEqual(result.campaign_profile, "original")
@@ -189,6 +210,13 @@ class GuiHelperTests(unittest.TestCase):
         assert result.backup_dir is not None
         self.assertEqual(result.moved, [result.backup_dir / "old.ldf"])
         self.assertEqual((result.backup_dir / "old.ldf").read_text(encoding="utf-8"), "old campaign level")
+        delay_values = [
+            value
+            for level in result.campaign.levels
+            for value in self._generator2_delay_values(level.text)
+        ]
+        self.assertTrue(delay_values)
+        self.assertEqual(set(delay_values), {"0"})
 
     def test_configured_backup_workflow_skips_blanks_and_deduplicates_paths(self) -> None:
         single = self.tmp_path / "single.ldf"
@@ -229,6 +257,17 @@ class GuiHelperTests(unittest.TestCase):
         self.assertNotIn("find_legacy_executable", source)
         self.assertNotIn("load_dialogs", source)
         self.assertNotIn("load_license_text", source)
+
+    @staticmethod
+    def _generator2_delay_values(text: str) -> list[str]:
+        values: list[str] = []
+        for line in text.splitlines():
+            if "=" not in line:
+                continue
+            key, value = (part.strip() for part in line.split("=", 1))
+            if key in GENERATOR2_ENEMY_STATION_DELAY_KEYS:
+                values.append(value)
+        return values
 
     def test_unit_enable_mapping_uses_legacy_checkbox_ids(self) -> None:
         vehicles, buildings, faction = _unit_enable_values(

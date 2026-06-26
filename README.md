@@ -28,6 +28,8 @@ python -m ualg.cli gen2 single --seed 12345 --level-id 1 --output out/L0101.ldf
 python -m ualg.cli gen2 campaign --seed 12345 --output-dir out/gen2
 ```
 
+For Generator2, add `--zero-enemy-station-delays` to set all enemy host station `*_delay` values to `0`.
+
 Launch the GUI:
 
 ```powershell
