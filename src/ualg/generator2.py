@@ -8,6 +8,9 @@ from time import time
 from typing import Any
 
 from .constants import (
+    BLG_PLAYER_BASE,
+    BLG_SUPERITEM,
+    BUILDING_TYP_BY_ID,
     GENERATOR2_BUILDINGS,
     GENERATOR2_CAMPAIGN_LEVEL_IDS,
     GENERATOR2_CAMPAIGN_PROFILES,
@@ -25,6 +28,10 @@ from .constants import (
     GENERATOR2_SKIES,
     GENERATOR2_VEHICLES,
     GENERATOR1_MD_GHORKOV_PLAYER_ROBO_BY_LEVEL,
+    TYP_GATE_CLOSED_1,
+    TYP_GATE_CLOSED_2,
+    TYP_PLAYER_BASE,
+    TYP_SUPERITEM,
     level_filename,
 )
 from .data import UA_METROPOLIS_DAWN_PROFILE, ua_mission_briefing_maps
@@ -119,6 +126,7 @@ class Generator2:
         self._create_squads(level)
         for map_type in ("typ", "own", "hgt", "blg"):
             self._make_map(level, map_type)
+        self._apply_special_map_rules(level)
         text = self._write_level(level)
         return GeneratedLevel(
             filename=level_filename(level_id),
@@ -215,7 +223,7 @@ class Generator2:
             level.bombs.append(bomb)
             for _ in range(8):
                 if level.rng.rand_range(0, 1):
-                    key = self._random_xy(level, "gates,bombs")
+                    key = self._random_xy(level, "hosts,gates,bombs,bomb_keys")
                     if key:
                         bomb["keys"].append(key)
 
@@ -225,7 +233,7 @@ class Generator2:
                 self._add_squad(level)
 
     def _add_squad(self, level: _Level) -> None:
-        coords = self._random_xy(level, "hosts,bombs,squads,flaks")
+        coords = self._random_xy(level, "hosts,bombs,bomb_keys,squads,flaks")
         if not coords:
             return
         faction = level.rng.choice(self._present_factions(level))
@@ -474,10 +482,37 @@ class Generator2:
                         current[station["y"]][station["x"]] = building
             for _ in range(ceil(level.width * level.height / 120)):
                 if level.rng.rand_range(0, 2) != 0:
-                    coords = self._random_xy(level, "hosts,gates,bombs")
+                    coords = self._random_xy(level, "hosts,gates,bombs,bomb_keys")
                     if coords:
                         current[coords["y"]][coords["x"]] = 63
         level.maps[map_type] = current
+
+    def _apply_special_map_rules(self, level: _Level) -> None:
+        typ = level.maps["typ"]
+        blg = level.maps["blg"]
+
+        for y in range(level.height):
+            for x in range(level.width):
+                typ_value = BUILDING_TYP_BY_ID.get(blg[y][x])
+                if typ_value is not None:
+                    typ[y][x] = typ_value
+
+        for gate in level.gates:
+            self._set_map_cell(level, "typ", gate["x"], gate["y"], TYP_PLAYER_BASE)
+            self._set_map_cell(level, "blg", gate["x"], gate["y"], BLG_PLAYER_BASE)
+
+        for bomb in level.bombs:
+            self._set_map_cell(level, "typ", bomb["x"], bomb["y"], TYP_SUPERITEM)
+            self._set_map_cell(level, "blg", bomb["x"], bomb["y"], BLG_SUPERITEM)
+            for key in bomb["keys"]:
+                key_typ = TYP_GATE_CLOSED_1 if level.rng.rand_range(0, 1) else TYP_GATE_CLOSED_2
+                self._set_map_cell(level, "typ", key["x"], key["y"], key_typ)
+                self._set_map_cell(level, "blg", key["x"], key["y"], 0)
+
+    @staticmethod
+    def _set_map_cell(level: _Level, map_name: str, x: int, y: int, value: int) -> None:
+        if 0 <= x < level.width and 0 <= y < level.height:
+            level.maps[map_name][y][x] = value & 0xFF
 
     @staticmethod
     def _reset_map(level: _Level, map_type: str) -> MapRows:
@@ -564,6 +599,9 @@ class Generator2:
                 blocked.update((coords["x"], coords["y"]) for coords in level.excluded)
             elif name in {"gates", "bombs", "squads", "flaks", "powers"}:
                 blocked.update((coords["x"], coords["y"]) for coords in getattr(level, name))
+            elif name == "bomb_keys":
+                for bomb in level.bombs:
+                    blocked.update((key["x"], key["y"]) for key in bomb["keys"])
         result = []
         for x in range(1, level.width - 1):
             for y in range(1, level.height - 1):

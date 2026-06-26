@@ -12,6 +12,9 @@ SRC = ROOT / "src"
 sys.path.insert(0, str(SRC))
 
 from ualg.constants import (
+    BLG_PLAYER_BASE,
+    BLG_SUPERITEM,
+    BUILDING_TYP_BY_ID,
     BUILDINGS_BY_FACTION,
     FACTION_BLACK_SECT,
     FACTION_PLAYER,
@@ -31,6 +34,8 @@ from ualg.constants import (
     TYP_GATE_CLOSED_1,
     TYP_GATE_CLOSED_2,
     TYP_MAP_INTERIOR_LOOKUP,
+    TYP_PLAYER_BASE,
+    TYP_SUPERITEM,
 )
 from ualg.data import (
     UA_METROPOLIS_DAWN_PROFILE,
@@ -433,10 +438,41 @@ class CoreTests(unittest.TestCase):
         for seed in range(1, 25):
             level = Generator2().generate_single(seed=seed, level_id=1)
             allowed = set(GENERATOR2_SET_LIST[level.tileset])
-            typ = parse_maps(level.text)["typ_map"][2]
+            maps = parse_maps(level.text)
+            typ = maps["typ_map"][2]
+            blg = maps["blg_map"][2]
             for y in range(1, level.height - 1):
                 for x in range(1, level.width - 1):
+                    if blg[y][x] or typ[y][x] in {TYP_GATE_CLOSED_1, TYP_GATE_CLOSED_2}:
+                        continue
                     self.assertIn(typ[y][x], allowed)
+
+    def test_generator2_special_cells_match_maps(self) -> None:
+        for seed in range(1, 25):
+            level = Generator2().generate_single(seed=seed, level_id=1)
+            maps = parse_maps(level.text)
+            typ = maps["typ_map"][2]
+            blg = maps["blg_map"][2]
+
+            for y in range(1, level.height - 1):
+                for x in range(1, level.width - 1):
+                    if blg[y][x] in BUILDING_TYP_BY_ID:
+                        self.assertEqual(typ[y][x], BUILDING_TYP_BY_ID[blg[y][x]])
+
+            for block in self._blocks(level.text, "begin_gate"):
+                x = int(self._property_values(block, "sec_x")[0])
+                y = int(self._property_values(block, "sec_y")[0])
+                self.assertEqual(typ[y][x], TYP_PLAYER_BASE)
+                self.assertEqual(blg[y][x], BLG_PLAYER_BASE)
+
+            for block in self._blocks(level.text, "begin_item"):
+                x = int(self._property_values(block, "sec_x")[0])
+                y = int(self._property_values(block, "sec_y")[0])
+                self.assertEqual(typ[y][x], TYP_SUPERITEM)
+                self.assertEqual(blg[y][x], BLG_SUPERITEM)
+                for key_x, key_y in self._keysec_pairs(block):
+                    self.assertIn(typ[key_y][key_x], {TYP_GATE_CLOSED_1, TYP_GATE_CLOSED_2})
+                    self.assertEqual(blg[key_y][key_x], 0)
 
     def test_generator2_squad_blocks_do_not_emit_mb_status(self) -> None:
         found_squad = False
