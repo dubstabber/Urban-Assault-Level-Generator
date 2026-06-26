@@ -156,7 +156,11 @@ class GuiHelperTests(unittest.TestCase):
             main(["unexpected"])
 
     def test_gui_source_does_not_probe_legacy_executable(self) -> None:
-        source = (SRC / "ualg" / "gui.py").read_text(encoding="utf-8")
+        gui_files = [
+            SRC / "ualg" / "gui.py",
+            *(SRC / "ualg" / "gui_support").glob("*.py"),
+        ]
+        source = "\n".join(path.read_text(encoding="utf-8") for path in gui_files)
 
         self.assertNotIn("find_legacy_executable", source)
         self.assertNotIn("load_dialogs", source)
