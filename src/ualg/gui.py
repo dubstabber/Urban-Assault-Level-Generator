@@ -894,20 +894,20 @@ class CustomWizardDialog:
 
         self._init_variables()
 
-        outer = tk.Frame(self.window, padx=10, pady=8)
-        outer.grid(row=0, column=0, sticky="nsew")
-        outer.columnconfigure(0, weight=1)
+        self.outer = tk.Frame(self.window, padx=10, pady=8)
+        self.outer.grid(row=0, column=0, sticky="nsew")
+        self.outer.columnconfigure(0, weight=1)
 
         self.title_var = tk.StringVar()
-        tk.Label(outer, textvariable=self.title_var, anchor="w", font=("TkDefaultFont", 10, "bold")).grid(
+        tk.Label(self.outer, textvariable=self.title_var, anchor="w", font=("TkDefaultFont", 10, "bold")).grid(
             row=0,
             column=0,
             sticky="ew",
         )
-        self.page_frame = tk.Frame(outer)
+        self.page_frame = tk.Frame(self.outer)
         self.page_frame.grid(row=1, column=0, sticky="nsew", pady=(8, 8))
 
-        nav = tk.Frame(outer)
+        nav = tk.Frame(self.outer)
         nav.grid(row=2, column=0, sticky="ew")
         nav.columnconfigure(0, weight=1)
         self.cancel_button = tk.Button(nav, text="Cancel", command=self.cancel, width=12)
@@ -992,6 +992,26 @@ class CustomWizardDialog:
         ]
         builders[self.page_index](self.page_frame)
         self._update_nav()
+        self._schedule_fit_to_content()
+
+    def _schedule_fit_to_content(self) -> None:
+        self._fit_to_content()
+        self.window.after_idle(self._fit_to_content)
+
+    def _fit_to_content(self) -> None:
+        try:
+            if not self.window.winfo_exists():
+                return
+            self.window.update_idletasks()
+            width = self.window.winfo_reqwidth()
+            height = self.window.winfo_reqheight()
+            screen_width = self.window.winfo_screenwidth()
+            screen_height = self.window.winfo_screenheight()
+            x = max(0, min(self.window.winfo_x(), max(0, screen_width - width)))
+            y = max(0, min(self.window.winfo_y(), max(0, screen_height - height)))
+            self.window.geometry(f"{width}x{height}+{x}+{y}")
+        except tk.TclError:
+            return
 
     def next_page(self) -> None:
         if self._validate_current_page():
