@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
+from typing import TypeVar
 
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
@@ -13,10 +15,8 @@ from ..constants import (
     GENERATOR2_LEVELS,
     level_filename,
 )
-from ..generator1 import Generator1, Generator1CustomOptions
-from ..generator2 import Generator2
+from ..generator1 import Generator1CustomOptions
 from ..legacy_resources import LegacyDialog
-from .backups import backup_campaign_ldfs, backup_existing_file
 from .custom_wizard import CustomWizardDialog
 from .legacy_dialogs import (
     LEGACY_CAMPAIGN_DIALOG,
@@ -30,9 +30,20 @@ from .legacy_dialogs import (
     _int_from_var,
 )
 from .settings import GuiSettings, default_settings_path, load_settings, save_settings
+from .workflows import (
+    CampaignGenerationResult,
+    LevelGenerationResult,
+    create_configured_backups,
+    generate_generator1_campaign,
+    generate_generator1_custom,
+    generate_generator1_single,
+    generate_generator2_campaign,
+    generate_generator2_single,
+)
 
 
 APP_TITLE = "Urban Assault Level Generator"
+WorkflowResult = TypeVar("WorkflowResult")
 
 
 class Generator1GUI:
@@ -388,157 +399,135 @@ class Generator1GUI:
         self._generate_generator2_campaign(directory, seed=seed, campaign_profile=campaign_profile)
 
     def _generate_single(self, target: Path, seed: int, difficulty: int, skill: int, improved: bool) -> None:
-        try:
-            self._set_status("Generating level...")
-            backup_path = backup_existing_file(target)
-            level = Generator1().generate_single(seed=seed, difficulty=difficulty, skill=skill, improved=improved)
-            written = level.write(target)
-            self._save_settings_quiet()
-        except Exception as exc:
-            self._set_status("Generation failed.")
-            messagebox.showerror("Generation Failed", str(exc), parent=self.root)
-            return
-
-        lines = [
-            f"Wrote {written}",
-            f"Seed: {level.seed}",
-            f"Map: {level.width}x{level.height}",
-            f"Tileset: {level.tileset}",
-        ]
-        if backup_path is not None:
-            lines.append(f"Backup: {backup_path}")
-        self._set_status(f"Wrote {written}")
-        messagebox.showinfo("Level Created", "\n".join(lines), parent=self.root)
+        self._run_generation_workflow(
+            start_status="Generating level...",
+            failure_status="Generation failed.",
+            error_title="Generation Failed",
+            success_title="Level Created",
+            action=lambda: generate_generator1_single(
+                target,
+                seed=seed,
+                difficulty=difficulty,
+                skill=skill,
+                improved=improved,
+            ),
+            success_status=lambda result: f"Wrote {result.written}",
+            success_lines=self._level_created_lines,
+        )
 
     def _generate_custom(self, target: Path, options: Generator1CustomOptions) -> None:
+        self._run_generation_workflow(
+            start_status="Generating custom level...",
+            failure_status="Custom generation failed.",
+            error_title="Generation Failed",
+            success_title="Level Created",
+            action=lambda: generate_generator1_custom(target, options),
+            success_status=lambda result: f"Wrote {result.written}",
+            success_lines=self._level_created_lines,
+        )
+
+    def _generate_campaign(self, directory: Path, seed: int, campaign_profile: str) -> None:
+        self._run_generation_workflow(
+            start_status="Generating campaign...",
+            failure_status="Campaign generation failed.",
+            error_title="Campaign Generation Failed",
+            success_title="Campaign Created",
+            action=lambda: generate_generator1_campaign(directory, seed=seed, campaign_profile=campaign_profile),
+            success_status=lambda result: f"Wrote {len(result.written)} campaign levels.",
+            success_lines=lambda result: self._campaign_created_lines(result, "Generator1"),
+        )
+
+    def _generate_generator2_single(self, target: Path, seed: int, level_id: int) -> None:
+        self._run_generation_workflow(
+            start_status="Generating Generator2 level...",
+            failure_status="Generator2 generation failed.",
+            error_title="Generation Failed",
+            success_title="Generator2 Level Created",
+            action=lambda: generate_generator2_single(target, seed=seed, level_id=level_id),
+            success_status=lambda result: f"Wrote {result.written}",
+            success_lines=self._generator2_level_created_lines,
+        )
+
+    def _generate_generator2_campaign(self, directory: Path, seed: int, campaign_profile: str) -> None:
+        self._run_generation_workflow(
+            start_status="Generating Generator2 campaign...",
+            failure_status="Generator2 campaign generation failed.",
+            error_title="Campaign Generation Failed",
+            success_title="Generator2 Campaign Created",
+            action=lambda: generate_generator2_campaign(directory, seed=seed, campaign_profile=campaign_profile),
+            success_status=lambda result: f"Wrote {len(result.written)} Generator2 campaign levels.",
+            success_lines=lambda result: self._campaign_created_lines(result, "Generator2"),
+        )
+
+    def _create_backup(self) -> None:
+        result = create_configured_backups(
+            (self.random_file_var.get(), self.custom_file_var.get(), self.generator2_single_file_var.get()),
+            (self.campaign_dir_var.get(), self.generator2_campaign_dir_var.get()),
+        )
+        if not result.created:
+            self._set_status("No existing generated files found to back up.")
+            messagebox.showinfo("Create Backup", "No existing generated files found to back up.", parent=self.root)
+            return
+        self._set_status(f"Created backup for {len(result.created)} item(s).")
+        messagebox.showinfo("Create Backup", "Backup created.", parent=self.root)
+
+    def _run_generation_workflow(
+        self,
+        *,
+        start_status: str,
+        failure_status: str,
+        error_title: str,
+        success_title: str,
+        action: Callable[[], WorkflowResult],
+        success_status: Callable[[WorkflowResult], str],
+        success_lines: Callable[[WorkflowResult], list[str]],
+    ) -> None:
         try:
-            self._set_status("Generating custom level...")
-            backup_path = backup_existing_file(target)
-            level = Generator1().generate_custom(options)
-            written = level.write(target)
+            self._set_status(start_status)
+            result = action()
             self._save_settings_quiet()
         except Exception as exc:
-            self._set_status("Custom generation failed.")
-            messagebox.showerror("Generation Failed", str(exc), parent=self.root)
+            self._set_status(failure_status)
+            messagebox.showerror(error_title, str(exc), parent=self.root)
             return
 
+        self._set_status(success_status(result))
+        messagebox.showinfo(success_title, "\n".join(success_lines(result)), parent=self.root)
+
+    def _level_created_lines(self, result: LevelGenerationResult) -> list[str]:
+        level = result.level
         lines = [
-            f"Wrote {written}",
+            f"Wrote {result.written}",
             f"Seed: {level.seed}",
             f"Map: {level.width}x{level.height}",
             f"Tileset: {level.tileset}",
         ]
-        if backup_path is not None:
-            lines.append(f"Backup: {backup_path}")
-        self._set_status(f"Wrote {written}")
-        messagebox.showinfo("Level Created", "\n".join(lines), parent=self.root)
+        if result.backup_path is not None:
+            lines.append(f"Backup: {result.backup_path}")
+        return lines
 
-    def _generate_campaign(self, directory: Path, seed: int, campaign_profile: str) -> None:
-        try:
-            self._set_status("Generating campaign...")
-            backup_dir, moved = backup_campaign_ldfs(directory)
-            campaign = Generator1().generate_campaign(
-                seed=seed,
-                difficulty=5,
-                improved=True,
-                campaign_profile=campaign_profile,
-            )
-            written = campaign.write(directory)
-            self._save_settings_quiet()
-        except Exception as exc:
-            self._set_status("Campaign generation failed.")
-            messagebox.showerror("Campaign Generation Failed", str(exc), parent=self.root)
-            return
-
+    def _generator2_level_created_lines(self, result: LevelGenerationResult) -> list[str]:
+        level = result.level
         lines = [
-            f"Wrote {len(written)} Generator1 levels to {directory}",
-            f"Seed: {campaign.seed}",
-            f"Profile: {campaign_profile}",
-        ]
-        if backup_dir is not None:
-            lines.append(f"Backed up {len(moved)} existing LDF files to {backup_dir}")
-        self._set_status(f"Wrote {len(written)} campaign levels.")
-        messagebox.showinfo("Campaign Created", "\n".join(lines), parent=self.root)
-
-    def _generate_generator2_single(self, target: Path, seed: int, level_id: int) -> None:
-        try:
-            self._set_status("Generating Generator2 level...")
-            backup_path = backup_existing_file(target)
-            level = Generator2().generate_single(seed=seed, level_id=level_id)
-            written = level.write(target)
-            self._save_settings_quiet()
-        except Exception as exc:
-            self._set_status("Generator2 generation failed.")
-            messagebox.showerror("Generation Failed", str(exc), parent=self.root)
-            return
-
-        lines = [
-            f"Wrote {written}",
+            f"Wrote {result.written}",
             f"Level ID: {level.level_id}",
             f"Seed: {level.seed}",
             f"Map: {level.width}x{level.height}",
             f"Tileset: {level.tileset}",
         ]
-        if backup_path is not None:
-            lines.append(f"Backup: {backup_path}")
-        self._set_status(f"Wrote {written}")
-        messagebox.showinfo("Generator2 Level Created", "\n".join(lines), parent=self.root)
+        if result.backup_path is not None:
+            lines.append(f"Backup: {result.backup_path}")
+        return lines
 
-    def _generate_generator2_campaign(self, directory: Path, seed: int, campaign_profile: str) -> None:
-        try:
-            self._set_status("Generating Generator2 campaign...")
-            backup_dir, moved = backup_campaign_ldfs(directory)
-            campaign = Generator2().generate_campaign(seed=seed, campaign_profile=campaign_profile)
-            written = campaign.write(directory)
-            self._save_settings_quiet()
-        except Exception as exc:
-            self._set_status("Generator2 campaign generation failed.")
-            messagebox.showerror("Campaign Generation Failed", str(exc), parent=self.root)
-            return
-
+    def _campaign_created_lines(self, result: CampaignGenerationResult, generator_name: str) -> list[str]:
         lines = [
-            f"Wrote {len(written)} Generator2 levels to {directory}",
-            f"Seed: {campaign.seed}",
-            f"Profile: {campaign_profile}",
+            f"Wrote {len(result.written)} {generator_name} levels to {result.directory}",
+            f"Seed: {result.campaign.seed}",
+            f"Profile: {result.campaign_profile}",
         ]
-        if backup_dir is not None:
-            lines.append(f"Backed up {len(moved)} existing LDF files to {backup_dir}")
-        self._set_status(f"Wrote {len(written)} Generator2 campaign levels.")
-        messagebox.showinfo("Generator2 Campaign Created", "\n".join(lines), parent=self.root)
-
-    def _create_backup(self) -> None:
-        created: list[Path] = []
-        seen_files: set[Path] = set()
-        for raw_path in (self.random_file_var.get(), self.custom_file_var.get(), self.generator2_single_file_var.get()):
-            if not raw_path.strip():
-                continue
-            path = Path(raw_path)
-            if path in seen_files:
-                continue
-            seen_files.add(path)
-            backup_path = backup_existing_file(path)
-            if backup_path is not None:
-                created.append(backup_path)
-
-        seen_dirs: set[Path] = set()
-        for campaign_dir_text in (self.campaign_dir_var.get().strip(), self.generator2_campaign_dir_var.get().strip()):
-            if not campaign_dir_text:
-                continue
-            campaign_dir = Path(campaign_dir_text)
-            if campaign_dir in seen_dirs:
-                continue
-            seen_dirs.add(campaign_dir)
-            backup_dir, moved = backup_campaign_ldfs(campaign_dir)
-            if backup_dir is not None:
-                created.append(backup_dir)
-                created.extend(moved)
-
-        if not created:
-            self._set_status("No existing generated files found to back up.")
-            messagebox.showinfo("Create Backup", "No existing generated files found to back up.", parent=self.root)
-            return
-        self._set_status(f"Created backup for {len(created)} item(s).")
-        messagebox.showinfo("Create Backup", "Backup created.", parent=self.root)
+        if result.backup_dir is not None:
+            lines.append(f"Backed up {len(result.moved)} existing LDF files to {result.backup_dir}")
+        return lines
 
     def _browse_random_file(self) -> None:
         path = self._ask_save_file("Select single level output file", self.random_file_var.get(), "level_01.ldf")
