@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .constants import GENERATOR1_CAMPAIGN_PROFILES
+from .constants import GENERATOR1_CAMPAIGN_PROFILES, GENERATOR2_CAMPAIGN_PROFILES
 from .generator1 import Generator1
 from .generator2 import Generator2
 
@@ -42,6 +42,12 @@ def build_parser() -> argparse.ArgumentParser:
     gen2_single.add_argument("--output", required=True)
     gen2_campaign = gen2_sub.add_parser("campaign", help="Generate the 42-level Generator2 campaign")
     gen2_campaign.add_argument("--seed", type=int, default=0)
+    gen2_campaign.add_argument(
+        "--campaign-profile",
+        choices=GENERATOR2_CAMPAIGN_PROFILES,
+        default="original",
+        help="Generator2 campaign roster/profile to generate",
+    )
     gen2_campaign.add_argument("--output-dir", required=True)
 
     return parser
@@ -78,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
         path = level.write(args.output)
         print(f"Wrote {path}")
         return 0
-    campaign = generator.generate_campaign(seed=args.seed)
+    campaign = generator.generate_campaign(seed=args.seed, campaign_profile=args.campaign_profile)
     written = campaign.write(args.output_dir)
     print(f"Wrote {len(written)} Generator2 levels to {Path(args.output_dir)}")
     return 0

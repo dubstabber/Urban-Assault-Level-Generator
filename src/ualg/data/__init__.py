@@ -123,5 +123,15 @@ def ua_building_typ_map(profile: str = UA_ORIGINAL_PROFILE) -> dict[int, int]:
 
 
 @cache
+def ua_mission_briefing_maps(profile: str = UA_ORIGINAL_PROFILE) -> list[str]:
+    return [str(map_name) for map_name in ua_data()[profile].get("missionBriefingMaps", [])]
+
+
+@cache
+def ua_mission_debriefing_maps(profile: str = UA_ORIGINAL_PROFILE) -> list[str]:
+    return [str(map_name) for map_name in ua_data()[profile].get("missionDebriefingMaps", [])]
+
+
+@cache
 def ua_level_ids(profile: str = UA_ORIGINAL_PROFILE) -> list[int]:
     return [int(level_id) for level_id in ua_data()[profile].get("levels", [])]

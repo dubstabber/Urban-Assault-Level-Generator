@@ -255,9 +255,19 @@ GENERATOR2_CAMPAIGN_LEVEL_IDS = [
     30, 31, 32, 33, 34, 40, 41, 42, 43, 44, 50, 51, 52, 53, 54,
     60, 61, 62, 63, 64, 66, 70, 71, 72, 73, 74, 75,
 ]
+GENERATOR2_CAMPAIGN_PROFILES = ("original", "md-ghorkov", "md-taerkasten")
+GENERATOR2_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE = {
+    profile: list(level_ids)
+    for profile, level_ids in GENERATOR1_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE.items()
+}
+GENERATOR2_MD_CAMPAIGN_TARGETS_BY_PROFILE = {
+    profile: {level_id: list(targets) for level_id, targets in target_graph.items()}
+    for profile, target_graph in GENERATOR1_MD_CAMPAIGN_TARGETS_BY_PROFILE.items()
+}
 
 GENERATOR2_FACTIONS = ["sul", "myk", "tae", "bla", "gho"]
 GENERATOR2_FACTION_IDS = {"res": 1, "sul": 2, "myk": 3, "tae": 4, "bla": 5, "gho": 6}
+GENERATOR2_FACTION_CODES_BY_ID = {faction_id: faction for faction, faction_id in GENERATOR2_FACTION_IDS.items()}
 GENERATOR2_HOST_VEHICLES = {"sul": 61, "myk": 58, "tae": 60, "bla": 62}
 GENERATOR2_SET_LIST = {
     1: [
@@ -349,6 +359,21 @@ GENERATOR2_BUILDINGS = {
     "tae": [17, 31, 53, 73],
     "bla": [18, 1, 54, 64],
     "gho": [30, 52, 12, 71],
+}
+GENERATOR2_MD_VEHICLES = {
+    GENERATOR2_FACTION_CODES_BY_ID[faction]: list(vehicles)
+    for faction, vehicles in METROPOLIS_DAWN_VEHICLES_BY_FACTION.items()
+    if faction in GENERATOR2_FACTION_CODES_BY_ID
+}
+GENERATOR2_MD_BUILDINGS = {
+    GENERATOR2_FACTION_CODES_BY_ID[faction]: list(buildings)
+    for faction, buildings in METROPOLIS_DAWN_BUILDINGS_BY_FACTION.items()
+    if faction in GENERATOR2_FACTION_CODES_BY_ID
+}
+GENERATOR2_MD_PLAYER_ROBOS = {
+    GENERATOR2_FACTION_CODES_BY_ID[faction]: list(robos)
+    for faction, robos in METROPOLIS_DAWN_PLAYER_ROBOS_BY_FACTION.items()
+    if faction in GENERATOR2_FACTION_CODES_BY_ID
 }
 GENERATOR2_SCOUT_VEHICLES = {9, 74, 67, 35, 29}
 GENERATOR2_SKIES = [

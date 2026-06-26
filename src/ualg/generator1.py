@@ -54,7 +54,11 @@ from .constants import (
     sector_to_world_x,
     sector_to_world_z,
 )
-from .data import tileset_compatibility
+from .data import (
+    UA_METROPOLIS_DAWN_PROFILE,
+    tileset_compatibility,
+    ua_mission_briefing_maps,
+)
 from .ldf import LDFWriter
 from .models import GeneratedCampaign, GeneratedLevel, MapRows
 from .rng import MSVCRTRandom
@@ -155,6 +159,8 @@ class _State:
     scenario_category: int = 0
     improved: bool = True
     campaign_profile: str = "original"
+    mission_briefing_map: str = "MB_02.IFF"
+    mission_debriefing_map: str = "DB_02.IFF"
     player_faction: int = FACTION_PLAYER
     generator1_campaign_mode: bool = False
     emit_player_enablement: bool = True
@@ -261,9 +267,9 @@ class Generator1:
         levels: list[GeneratedLevel] = []
         for i, filename in enumerate(filenames):
             state = _State(rng=rng, seed=rng.state, difficulty=difficulty, improved=improved)
-            self._apply_campaign_profile(state, campaign_profile)
             state.level_index = i + 1
             state.level_id = level_id_from_filename(filename)
+            self._apply_campaign_profile(state, campaign_profile)
             state.generator1_campaign_mode = True
             state.emit_player_enablement = False
             state.player_tech_vehicle_ids = list(player_tech_vehicle_ids)
@@ -335,6 +341,17 @@ class Generator1:
         state.buildings_by_faction = self._profile_buildings(campaign_profile)
         if campaign_profile.startswith("md-"):
             state.host_vehicle_by_faction = dict(METROPOLIS_DAWN_HOST_VEHICLE_BY_FACTION)
+            state.mission_briefing_map = self._mission_briefing_map_for_level(state.level_id)
+            state.mission_debriefing_map = state.mission_briefing_map
+
+    @staticmethod
+    def _mission_briefing_map_for_level(level_id: int) -> str:
+        maps = ua_mission_briefing_maps(UA_METROPOLIS_DAWN_PROFILE)
+        expected = f"mb_{level_id:02d}.iff"
+        for map_name in maps:
+            if map_name.lower() == expected:
+                return map_name.upper()
+        return maps[level_id % len(maps)].upper()
 
     def generate_custom(self, options: Generator1CustomOptions) -> GeneratedLevel:
         seed = self._normalize_seed(options.seed)
@@ -844,7 +861,7 @@ class Generator1:
     def _write_level(self, state: _State) -> str:
         writer = LDFWriter(property_style="tabs")
         self._write_header(writer, state)
-        self._write_brief_maps(writer)
+        self._write_brief_maps(writer, state)
         self._seed_beam_gate_keys(state)
         self._write_beam_gate(writer, state)
         self._write_superitems(writer, state)
@@ -879,13 +896,13 @@ class Generator1:
         writer.end_block()
         writer.line("")
 
-    def _write_brief_maps(self, writer: LDFWriter) -> None:
+    def _write_brief_maps(self, writer: LDFWriter, state: _State) -> None:
         writer.line("begin_mbmap")
-        writer.property("name", "MB_02.IFF")
+        writer.property("name", state.mission_briefing_map)
         writer.end_block()
         writer.line("")
         writer.line("begin_dbmap")
-        writer.property("name", "DB_02.IFF")
+        writer.property("name", state.mission_debriefing_map)
         writer.end_block()
         writer.line("")
 

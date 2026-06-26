@@ -24,13 +24,22 @@ from ualg.constants import (
     GENERATOR1_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE,
     GENERATOR1_MD_CAMPAIGN_TARGETS_BY_PROFILE,
     GENERATOR2_CAMPAIGN_LEVEL_IDS,
+    GENERATOR2_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE,
+    GENERATOR2_MD_CAMPAIGN_TARGETS_BY_PROFILE,
     GENERATOR2_SET_LIST,
     VEHICLES_BY_FACTION,
     TYP_GATE_CLOSED_1,
     TYP_GATE_CLOSED_2,
     TYP_MAP_INTERIOR_LOOKUP,
 )
-from ualg.data import UA_ORIGINAL_PROFILE, tileset_compatibility, ua_faction_buildings, ua_faction_units
+from ualg.data import (
+    UA_METROPOLIS_DAWN_PROFILE,
+    UA_ORIGINAL_PROFILE,
+    tileset_compatibility,
+    ua_faction_buildings,
+    ua_faction_units,
+    ua_mission_briefing_maps,
+)
 from ualg.generator1 import Generator1, Generator1CustomOptions
 from ualg.generator2 import Generator2
 from ualg.ldf import parse_maps
@@ -49,6 +58,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("begin_robo", level.text)
         self.assertIn("begin_maps", level.text)
         self.assertIn("begin_enable\t1", level.text)
+        self.assertEqual(self._mission_maps(level.text), ("MB_02.IFF", "DB_02.IFF"))
         maps = parse_maps(level.text)
         self.assertEqual(set(maps), {"typ_map", "own_map", "hgt_map", "blg_map"})
         for _name, (width, height, rows) in maps.items():
@@ -117,6 +127,7 @@ class CoreTests(unittest.TestCase):
 
         self.assertEqual([level.filename for level in campaign.levels], expected_filenames)
         self.assertEqual(len(campaign.levels), 16)
+        self._assert_metropolis_dawn_mission_maps(campaign.levels)
         by_id = {level.level_id: level for level in campaign.levels}
         for level_id, targets in GENERATOR1_MD_CAMPAIGN_TARGETS_BY_PROFILE["md-ghorkov"].items():
             self.assertEqual(self._gate_targets(by_id[level_id].text), targets)
@@ -137,6 +148,7 @@ class CoreTests(unittest.TestCase):
 
         self.assertEqual([level.filename for level in campaign.levels], expected_filenames)
         self.assertEqual(len(campaign.levels), 15)
+        self._assert_metropolis_dawn_mission_maps(campaign.levels)
         by_id = {level.level_id: level for level in campaign.levels}
         for level_id, targets in GENERATOR1_MD_CAMPAIGN_TARGETS_BY_PROFILE["md-taerkasten"].items():
             self.assertEqual(self._gate_targets(by_id[level_id].text), targets)
@@ -293,6 +305,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Generator: Generator2", first.text)
         self.assertIn("begin_gate", first.text)
         self.assertIn("begin_enable", first.text)
+        self.assertEqual(self._mission_maps(first.text), ("MB_15.IFF", "DB_15.IFF"))
         maps = parse_maps(first.text)
         self.assertEqual(set(maps), {"typ_map", "own_map", "hgt_map", "blg_map"})
         self.assertGreaterEqual((first.width - 2) * (first.height - 2), 80)
@@ -313,6 +326,38 @@ class CoreTests(unittest.TestCase):
         self.assertIn("= 44", by_id[34].text)
         self.assertNotIn("target_level", by_id[15].text)
         self.assertIn("= 15", by_id[75].text)
+
+    def test_generator2_metropolis_dawn_ghorkov_campaign_profile(self) -> None:
+        campaign = Generator2().generate_campaign(seed=998877, campaign_profile="md-ghorkov")
+        expected_ids = GENERATOR2_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE["md-ghorkov"]
+
+        self.assertEqual([level.level_id for level in campaign.levels], expected_ids)
+        self.assertEqual(len(campaign.levels), 16)
+        self._assert_metropolis_dawn_mission_maps(campaign.levels)
+        by_id = {level.level_id: level for level in campaign.levels}
+        for level_id, targets in GENERATOR2_MD_CAMPAIGN_TARGETS_BY_PROFILE["md-ghorkov"].items():
+            self.assertEqual(self._gate_targets(by_id[level_id].text), targets)
+
+        self.assertEqual(self._robo_owner_vehicles(by_id[35].text)[0], (6, 176))
+        self.assertEqual(self._robo_owner_vehicles(by_id[37].text)[0], (6, 177))
+        for level in campaign.levels:
+            self.assertTrue(all(owner != 6 for owner, _vehicle in self._robo_owner_vehicles(level.text)[1:]))
+
+    def test_generator2_metropolis_dawn_taerkasten_campaign_profile(self) -> None:
+        campaign = Generator2().generate_campaign(seed=998877, campaign_profile="md-taerkasten")
+        expected_ids = GENERATOR2_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE["md-taerkasten"]
+
+        self.assertEqual([level.level_id for level in campaign.levels], expected_ids)
+        self.assertEqual(len(campaign.levels), 15)
+        self._assert_metropolis_dawn_mission_maps(campaign.levels)
+        by_id = {level.level_id: level for level in campaign.levels}
+        for level_id, targets in GENERATOR2_MD_CAMPAIGN_TARGETS_BY_PROFILE["md-taerkasten"].items():
+            self.assertEqual(self._gate_targets(by_id[level_id].text), targets)
+
+        for level in campaign.levels:
+            owner_vehicles = self._robo_owner_vehicles(level.text)
+            self.assertEqual(owner_vehicles[0], (4, 178))
+            self.assertTrue(all(owner != 4 for owner, _vehicle in owner_vehicles[1:]))
 
     def test_generator2_typ_map_uses_legacy_set_list(self) -> None:
         for values in GENERATOR2_SET_LIST.values():
@@ -346,6 +391,7 @@ class CoreTests(unittest.TestCase):
         gen1_campaign = ROOT / ".cli_smoke_gen1_campaign"
         gen1_md_campaign = ROOT / ".cli_smoke_gen1_md_campaign"
         gen2_output = ROOT / ".cli_smoke_gen2_single.ldf"
+        gen2_md_campaign = ROOT / ".cli_smoke_gen2_md_campaign"
         env = {**os.environ, "PYTHONPATH": str(SRC), "PYTHONDONTWRITEBYTECODE": "1"}
         try:
             result = subprocess.run(
@@ -409,6 +455,33 @@ class CoreTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue(gen2_output.exists())
             self.assertIn("begin_level", gen2_output.read_text(encoding="utf-8"))
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    "-m",
+                    "ualg.cli",
+                    "gen2",
+                    "campaign",
+                    "--seed",
+                    "1234",
+                    "--campaign-profile",
+                    "md-taerkasten",
+                    "--output-dir",
+                    str(gen2_md_campaign),
+                ],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                len(list(gen2_md_campaign.glob("*.ldf"))),
+                len(GENERATOR2_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE["md-taerkasten"]),
+            )
         finally:
             for output in (gen1_output, gen2_output):
                 if output.exists():
@@ -417,6 +490,8 @@ class CoreTests(unittest.TestCase):
                 shutil.rmtree(gen1_campaign)
             if gen1_md_campaign.exists():
                 shutil.rmtree(gen1_md_campaign)
+            if gen2_md_campaign.exists():
+                shutil.rmtree(gen2_md_campaign)
 
     @staticmethod
     def _blocks(text: str, block_name: str) -> list[list[str]]:
@@ -477,6 +552,22 @@ class CoreTests(unittest.TestCase):
         for block in self._blocks(text, "begin_gate"):
             result.extend(int(value) for value in self._property_values(block, "target_level"))
         return result
+
+    def _mission_maps(self, text: str) -> tuple[str, str]:
+        mb_blocks = self._blocks(text, "begin_mbmap")
+        db_blocks = self._blocks(text, "begin_dbmap")
+        return (
+            self._property_values(mb_blocks[0], "name")[0],
+            self._property_values(db_blocks[0], "name")[0],
+        )
+
+    def _assert_metropolis_dawn_mission_maps(self, levels) -> None:
+        briefing_maps = {name.lower() for name in ua_mission_briefing_maps(UA_METROPOLIS_DAWN_PROFILE)}
+        for level in levels:
+            briefing_map, debriefing_map = self._mission_maps(level.text)
+            self.assertEqual(briefing_map.lower(), f"mb_{level.level_id:02d}.iff")
+            self.assertEqual(debriefing_map.lower(), briefing_map.lower())
+            self.assertIn(briefing_map.lower(), briefing_maps)
 
     @staticmethod
     def _dedupe(values: list[int]) -> list[int]:

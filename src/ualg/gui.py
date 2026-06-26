@@ -24,6 +24,7 @@ from .constants import (
     FACTION_TUTOR,
     GENERATOR1_CAMPAIGN_FILENAMES,
     GENERATOR1_CAMPAIGN_PROFILES,
+    GENERATOR2_CAMPAIGN_PROFILES,
     GENERATOR2_LEVELS,
     BUILDING_LABELS_BY_ID,
     BUILDINGS_BY_FACTION,
@@ -1344,6 +1345,7 @@ class Generator1GUI:
         self.generator2_level_id_var = tk.StringVar(value="1")
         self.generator2_seed_var = tk.StringVar(value="")
         self.generator2_campaign_seed_var = tk.StringVar(value="")
+        self.generator2_campaign_profile_var = tk.StringVar(value="original")
         self.building_scripts_var = tk.BooleanVar(value=settings.use_building_scripts)
         self.status_var = tk.StringVar(value="Ready.")
 
@@ -1501,15 +1503,25 @@ class Generator1GUI:
         tk.Entry(campaign, textvariable=self.generator2_campaign_seed_var, width=18).grid(
             row=0, column=1, sticky="w", pady=2
         )
+        tk.Label(campaign, text="Campaign profile:", anchor="w").grid(
+            row=1, column=0, sticky="w", padx=(0, 6), pady=2
+        )
+        ttk.Combobox(
+            campaign,
+            textvariable=self.generator2_campaign_profile_var,
+            values=list(GENERATOR2_CAMPAIGN_PROFILES),
+            state="readonly",
+            width=16,
+        ).grid(row=1, column=1, sticky="w", pady=2)
         self._path_row(
             campaign,
-            1,
+            2,
             "Campaign output folder:",
             self.generator2_campaign_dir_var,
             self._browse_generator2_campaign_dir,
         )
         tk.Button(campaign, text="Generate Campaign", command=self._make_generator2_campaign).grid(
-            row=4, column=0, columnspan=2, sticky="ew", pady=(8, 0)
+            row=6, column=0, columnspan=2, sticky="ew", pady=(8, 0)
         )
 
     def _build_legacy_main(self) -> None:
@@ -1664,7 +1676,8 @@ class Generator1GUI:
         directory = self._ensure_directory_path(self.generator2_campaign_dir_var, "Select Generator2 campaign output folder")
         if directory is None:
             return
-        self._generate_generator2_campaign(directory, seed=seed)
+        campaign_profile = self.generator2_campaign_profile_var.get().strip() or "original"
+        self._generate_generator2_campaign(directory, seed=seed, campaign_profile=campaign_profile)
 
     def _generate_single(self, target: Path, seed: int, difficulty: int, skill: int, improved: bool) -> None:
         try:
@@ -1763,11 +1776,11 @@ class Generator1GUI:
         self._set_status(f"Wrote {written}")
         messagebox.showinfo("Generator2 Level Created", "\n".join(lines), parent=self.root)
 
-    def _generate_generator2_campaign(self, directory: Path, seed: int) -> None:
+    def _generate_generator2_campaign(self, directory: Path, seed: int, campaign_profile: str) -> None:
         try:
             self._set_status("Generating Generator2 campaign...")
             backup_dir, moved = backup_campaign_ldfs(directory)
-            campaign = Generator2().generate_campaign(seed=seed)
+            campaign = Generator2().generate_campaign(seed=seed, campaign_profile=campaign_profile)
             written = campaign.write(directory)
             self._save_settings_quiet()
         except Exception as exc:
@@ -1775,7 +1788,11 @@ class Generator1GUI:
             messagebox.showerror("Campaign Generation Failed", str(exc), parent=self.root)
             return
 
-        lines = [f"Wrote {len(written)} Generator2 levels to {directory}", f"Seed: {campaign.seed}"]
+        lines = [
+            f"Wrote {len(written)} Generator2 levels to {directory}",
+            f"Seed: {campaign.seed}",
+            f"Profile: {campaign_profile}",
+        ]
         if backup_dir is not None:
             lines.append(f"Backed up {len(moved)} existing LDF files to {backup_dir}")
         self._set_status(f"Wrote {len(written)} Generator2 campaign levels.")

@@ -10,16 +10,24 @@ from typing import Any
 from .constants import (
     GENERATOR2_BUILDINGS,
     GENERATOR2_CAMPAIGN_LEVEL_IDS,
+    GENERATOR2_CAMPAIGN_PROFILES,
     GENERATOR2_FACTION_IDS,
     GENERATOR2_FACTIONS,
     GENERATOR2_HOST_VEHICLES,
     GENERATOR2_LEVELS,
+    GENERATOR2_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE,
+    GENERATOR2_MD_CAMPAIGN_TARGETS_BY_PROFILE,
+    GENERATOR2_MD_BUILDINGS,
+    GENERATOR2_MD_PLAYER_ROBOS,
+    GENERATOR2_MD_VEHICLES,
     GENERATOR2_SCOUT_VEHICLES,
     GENERATOR2_SET_LIST,
     GENERATOR2_SKIES,
     GENERATOR2_VEHICLES,
+    GENERATOR1_MD_GHORKOV_PLAYER_ROBO_BY_LEVEL,
     level_filename,
 )
+from .data import UA_METROPOLIS_DAWN_PROFILE, ua_mission_briefing_maps
 from .ldf import LDFWriter
 from .models import GeneratedCampaign, GeneratedLevel, MapRows
 from .rng import MSVCRTRandom
@@ -30,9 +38,22 @@ class _Level:
     level_id: int
     rng: MSVCRTRandom
     seed: int
+    campaign_profile: str = "original"
+    mission_briefing_map: str = "MB_15.IFF"
+    mission_debriefing_map: str = "DB_15.IFF"
+    player_faction: str = "res"
+    player_vehicle: int = 56
     width: int = 0
     height: int = 0
     tileset: int = 1
+    targets_by_level: dict[int, list[int]] = field(default_factory=lambda: {key: list(value) for key, value in GENERATOR2_LEVELS.items()})
+    vehicles_by_faction: dict[str, list[int]] = field(
+        default_factory=lambda: {faction: list(vehicles) for faction, vehicles in GENERATOR2_VEHICLES.items()}
+    )
+    buildings_by_faction: dict[str, list[int]] = field(
+        default_factory=lambda: {faction: list(buildings) for faction, buildings in GENERATOR2_BUILDINGS.items()}
+    )
+    host_vehicles: dict[str, int] = field(default_factory=lambda: {"res": 56, **GENERATOR2_HOST_VEHICLES})
     gates: list[dict[str, Any]] = field(default_factory=list)
     bombs: list[dict[str, Any]] = field(default_factory=list)
     squads: list[dict[str, Any]] = field(default_factory=list)
@@ -55,14 +76,40 @@ class Generator2:
         rng = MSVCRTRandom(seed)
         return self._generate_level(level_id, rng, seed)
 
-    def generate_campaign(self, seed: int = 0) -> GeneratedCampaign:
+    def generate_campaign(self, seed: int = 0, campaign_profile: str = "original") -> GeneratedCampaign:
+        campaign_profile = self._normalize_campaign_profile(campaign_profile)
         seed = self._normalize_seed(seed)
         rng = MSVCRTRandom(seed)
-        levels = [self._generate_level(level_id, rng, seed) for level_id in GENERATOR2_CAMPAIGN_LEVEL_IDS]
+        levels = [
+            self._generate_level(level_id, rng, seed, campaign_profile=campaign_profile)
+            for level_id in self._campaign_level_ids(campaign_profile)
+        ]
         return GeneratedCampaign(seed=seed, levels=levels)
 
-    def _generate_level(self, level_id: int, rng: MSVCRTRandom, seed: int) -> GeneratedLevel:
+    @staticmethod
+    def _normalize_campaign_profile(campaign_profile: str) -> str:
+        profile = campaign_profile.strip().lower()
+        if profile not in GENERATOR2_CAMPAIGN_PROFILES:
+            choices = ", ".join(GENERATOR2_CAMPAIGN_PROFILES)
+            raise ValueError(f"Unknown Generator2 campaign profile '{campaign_profile}'. Choose one of: {choices}.")
+        return profile
+
+    @staticmethod
+    def _campaign_level_ids(campaign_profile: str) -> list[int]:
+        if campaign_profile == "original":
+            return list(GENERATOR2_CAMPAIGN_LEVEL_IDS)
+        return list(GENERATOR2_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE[campaign_profile])
+
+    def _generate_level(
+        self,
+        level_id: int,
+        rng: MSVCRTRandom,
+        seed: int,
+        *,
+        campaign_profile: str = "original",
+    ) -> GeneratedLevel:
         level = _Level(level_id=level_id, rng=rng, seed=seed)
+        self._apply_campaign_profile(level, campaign_profile)
         self._choose_map_size(level)
         level.tileset = rng.rand_range(1, 6)
         self._create_gate(level)
@@ -82,8 +129,36 @@ class Generator2:
             tileset=level.tileset,
             text=text,
             maps=level.maps,
-            metadata={"generator": "generator2"},
+            metadata={"generator": "generator2", "campaign_profile": campaign_profile},
         )
+
+    @staticmethod
+    def _apply_campaign_profile(level: _Level, campaign_profile: str) -> None:
+        level.campaign_profile = campaign_profile
+        if campaign_profile == "original":
+            return
+        level.player_faction = "gho" if campaign_profile == "md-ghorkov" else "tae"
+        level.targets_by_level = {
+            key: list(value)
+            for key, value in GENERATOR2_MD_CAMPAIGN_TARGETS_BY_PROFILE[campaign_profile].items()
+        }
+        level.vehicles_by_faction = {faction: list(vehicles) for faction, vehicles in GENERATOR2_MD_VEHICLES.items()}
+        level.buildings_by_faction = {faction: list(buildings) for faction, buildings in GENERATOR2_MD_BUILDINGS.items()}
+        level.mission_briefing_map = Generator2._mission_briefing_map_for_level(level.level_id)
+        level.mission_debriefing_map = level.mission_briefing_map
+        if level.player_faction == "gho":
+            level.player_vehicle = GENERATOR1_MD_GHORKOV_PLAYER_ROBO_BY_LEVEL.get(level.level_id, 177)
+        else:
+            level.player_vehicle = GENERATOR2_MD_PLAYER_ROBOS["tae"][0]
+
+    @staticmethod
+    def _mission_briefing_map_for_level(level_id: int) -> str:
+        maps = ua_mission_briefing_maps(UA_METROPOLIS_DAWN_PROFILE)
+        expected = f"mb_{level_id:02d}.iff"
+        for map_name in maps:
+            if map_name.lower() == expected:
+                return map_name.upper()
+        return maps[level_id % len(maps)].upper()
 
     @staticmethod
     def _normalize_seed(seed: int) -> int:
@@ -99,10 +174,10 @@ class Generator2:
     def _create_gate(self, level: _Level) -> None:
         coords = self._random_xy(level, "gates")
         if coords:
-            level.gates.append({"x": coords["x"], "y": coords["y"], "targets": GENERATOR2_LEVELS[level.level_id]})
+            level.gates.append({"x": coords["x"], "y": coords["y"], "targets": level.targets_by_level[level.level_id]})
 
     def _create_player_station(self, level: _Level) -> None:
-        level.hosts["res"] = [self._random_xy(level)]
+        level.hosts[level.player_faction] = [self._random_xy(level)]
 
     def _create_enemy_stations(self, level: _Level) -> None:
         self._add_enemy_station(level, require_any_enemy=True)
@@ -116,7 +191,7 @@ class Generator2:
 
     def _add_enemy_station(self, level: _Level, require_any_enemy: bool) -> None:
         for _ in range(100):
-            faction = level.rng.choice(GENERATOR2_FACTIONS)
+            faction = level.rng.choice(self._enemy_factions(level))
             if self._total_hosts(level, faction) >= 2:
                 if require_any_enemy and self._total_hosts(level) == 0:
                     continue
@@ -154,12 +229,12 @@ class Generator2:
         if not coords:
             return
         faction = level.rng.choice(self._present_factions(level))
-        vehicle = level.rng.choice(GENERATOR2_VEHICLES[faction])
+        vehicle = level.rng.choice(level.vehicles_by_faction[faction])
         if vehicle in GENERATOR2_SCOUT_VEHICLES:
             squad_size = 1
         else:
             squad_size = level.rng.rand_range(3, 8)
-            if faction != "res" and level.rng.rand_range(0, 5) == 0:
+            if faction != level.player_faction and level.rng.rand_range(0, 5) == 0:
                 squad_size *= 2
         level.rng.rand_range(0, 4)  # Legacy template consumes this but does not serialize squad mb_status.
         level.squads.append({
@@ -206,12 +281,12 @@ class Generator2:
         writer.line("")
         writer.line("; Mission Briefing Map")
         writer.line("begin_mbmap")
-        writer.property("name", "MB_15.IFF")
+        writer.property("name", level.mission_briefing_map)
         writer.end_block()
         writer.line("")
         writer.line("; Mission Debriefing Map")
         writer.line("begin_dbmap")
-        writer.property("name", "DB_15.IFF")
+        writer.property("name", level.mission_debriefing_map)
         writer.end_block()
         writer.line("")
 
@@ -235,14 +310,14 @@ class Generator2:
         writer.line("")
 
     def _write_player_station(self, writer: LDFWriter, level: _Level) -> None:
-        station = level.hosts["res"][0]
+        station = level.hosts[level.player_faction][0]
         energy = level.rng.rand_range(6, 10) * 100000
         reload_const = floor((((energy - 550000) / 4) + 550000) / 5)
         writer.line("; Player Host Station")
         writer.line("")
         writer.line("begin_robo")
-        writer.property("owner", 1)
-        writer.property("vehicle", 56)
+        writer.property("owner", GENERATOR2_FACTION_IDS[level.player_faction])
+        writer.property("vehicle", level.player_vehicle)
         writer.property("pos_x", self._get_position(station["x"]))
         writer.property("pos_y", level.rng.rand_range(20, 45) * -10)
         writer.property("pos_z", self._get_position(station["y"], vertical=True))
@@ -254,12 +329,12 @@ class Generator2:
 
     def _write_enemy_stations(self, writer: LDFWriter, level: _Level) -> None:
         for faction in level.hosts:
-            if faction == "res":
+            if faction == level.player_faction:
                 continue
             for station in level.hosts[faction]:
                 energy = level.rng.rand_range(8, 22) * 100000
                 reload_const = floor(((energy - 500000) / 3) + 500000)
-                host_vehicle = GENERATOR2_HOST_VEHICLES.get(faction, 57)
+                host_vehicle = level.host_vehicles.get(faction, 57)
                 if faction == "gho":
                     host_vehicle = 57 if level.rng.rand_range(0, 2) != 0 else 59
                 writer.line("")
@@ -330,9 +405,9 @@ class Generator2:
         for faction in self._present_factions(level):
             writer.line("")
             writer.line(f"begin_enable {GENERATOR2_FACTION_IDS[faction]}")
-            for vehicle in GENERATOR2_VEHICLES[faction]:
+            for vehicle in level.vehicles_by_faction[faction]:
                 writer.property("vehicle", vehicle)
-            for building in GENERATOR2_BUILDINGS[faction]:
+            for building in level.buildings_by_faction[faction]:
                 writer.property("building", building)
             writer.end_block()
         writer.line("")
@@ -412,7 +487,7 @@ class Generator2:
     def _set_territory(self, level: _Level, current: MapRows, faction: str, max_territory: float) -> None:
         faction_id = GENERATOR2_FACTION_IDS[faction]
         iterations = ceil(max_territory)
-        if faction == "res":
+        if faction == level.player_faction:
             iterations = floor(max_territory * 0.2)
         for station in level.hosts.get(faction, []):
             self._set_territory_around(level, current, faction_id, station["x"], station["y"])
@@ -522,11 +597,17 @@ class Generator2:
     def _total_hosts(level: _Level, faction: str = "") -> int:
         if faction:
             return len(level.hosts.get(faction, []))
-        return sum(len(stations) for host_faction, stations in level.hosts.items() if host_faction != "res")
+        return sum(len(stations) for host_faction, stations in level.hosts.items() if host_faction != level.player_faction)
 
     @staticmethod
     def _present_factions(level: _Level) -> list[str]:
         return list(level.hosts.keys())
+
+    @staticmethod
+    def _enemy_factions(level: _Level) -> list[str]:
+        if level.campaign_profile == "original":
+            return list(GENERATOR2_FACTIONS)
+        return [faction for faction in GENERATOR2_FACTION_IDS if faction != level.player_faction]
 
     @staticmethod
     def _get_station_sectors(level: _Level) -> list[dict[str, Any]]:
