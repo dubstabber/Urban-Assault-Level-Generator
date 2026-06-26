@@ -731,7 +731,8 @@ class Generator1GUI:
             "Urban Assault Level Generator\n"
             "Python reimplementation of selected legacy generators.\n\n"
             "Original Random UA.exe: Daniel L. Orlando.\n"
-            "Python project: Urban Assault Level Generator Contributors.",
+            "Generator2 legacy/PHP generator: GitHub user dportalesr.\n"
+            "Python reimplementation: Ydro.",
             parent=self.root,
         )
 

@@ -9,7 +9,7 @@ description = "Python reimplementation of selected Urban Assault level generator
 readme = "README.md"
 requires-python = ">=3.11"
 license = "GPL-3.0-or-later"
-authors = [{ name = "Urban Assault Level Generator Contributors" }]
+authors = [{ name = "Ydro" }]
 dependencies = []
 
 [project.scripts]
