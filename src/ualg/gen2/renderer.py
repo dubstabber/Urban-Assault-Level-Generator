@@ -10,6 +10,10 @@ from ..constants import GENERATOR2_FACTION_IDS, GENERATOR2_SKIES
 from ..ldf import LDFWriter
 
 
+_CAMPAIGN_ENABLE_EXCLUDED_FACTIONS = {"res", "bla"}
+_CAMPAIGN_ENABLE_EXCLUDED_VEHICLE_IDS = {11, 133, 134}
+
+
 class Generator2Renderer:
     def __init__(self, map_builder: Generator2MapBuilder) -> None:
         self._map_builder = map_builder
@@ -179,12 +183,19 @@ class Generator2Renderer:
         for faction in self._map_builder._present_factions(level):
             writer.line("")
             writer.line(f"begin_enable {GENERATOR2_FACTION_IDS[faction]}")
-            for vehicle in level.vehicles_by_faction[faction]:
+            for vehicle in self._enabled_vehicles(level, faction):
                 writer.property("vehicle", vehicle)
             for building in level.buildings_by_faction[faction]:
                 writer.property("building", building)
             writer.end_block()
         writer.line("")
+
+    @staticmethod
+    def _enabled_vehicles(level: _Level, faction: str) -> list[int]:
+        vehicles = list(level.vehicles_by_faction[faction])
+        if faction not in _CAMPAIGN_ENABLE_EXCLUDED_FACTIONS:
+            return vehicles
+        return [vehicle for vehicle in vehicles if vehicle not in _CAMPAIGN_ENABLE_EXCLUDED_VEHICLE_IDS]
 
     def _write_maps(self, writer: LDFWriter, level: _Level) -> None:
         writer.line("begin_maps")

@@ -57,17 +57,17 @@ class CharacterizationTests(unittest.TestCase):
         campaign = Generator1().generate_campaign(seed=13579, difficulty=5)
         md_campaign = Generator1().generate_campaign(seed=1234, campaign_profile="md-ghorkov")
 
-        self.assertEqual(_campaign_hash(campaign), "cfc30b13adfb6b192d84d329c6fb3f2fdc128b261fa5cbc2e6927bf198c8cace")
-        self.assertEqual(_campaign_hash(md_campaign), "625f425737662d6ecc013d60196bac59cec76371aac3a17a823b3f471d342232")
+        self.assertEqual(_campaign_hash(campaign), "f93afc3fae8a40e88c6c2aaf82b612013dda07f4cca4b338fe82353a5fd61bf1")
+        self.assertEqual(_campaign_hash(md_campaign), "f5299e797649c62945e4cb6150d4b1ce886b78b563b64ccb3f7908a49ef760b6")
 
     def test_generator2_seeded_outputs(self) -> None:
         single = Generator2().generate_single(seed=112233, level_id=1)
         campaign = Generator2().generate_campaign(seed=998877)
         md_campaign = Generator2().generate_campaign(seed=998877, campaign_profile="md-taerkasten")
 
-        self.assertEqual(_text_hash(single.text), "054e34e1f1df475d95378b622822dc838d421bdc5e311d86a8380732742627c6")
-        self.assertEqual(_campaign_hash(campaign), "c46972e943ac40b77e49ab5d55fa2b4b4e91bfa7e333e941a961d7c6cfb67e94")
-        self.assertEqual(_campaign_hash(md_campaign), "ec9c0295efde3a27c59211f22ba5c5a66ba2ab58656599d8026f8726eaea5c94")
+        self.assertEqual(_text_hash(single.text), "ab9f5be7cb6195a031a9ee4df12948a2cf340aaea37677e23539768cb0944118")
+        self.assertEqual(_campaign_hash(campaign), "49871a8d83d8577cd0bff298c20f1656a512f33a712c7f9fc6cdf83eac6ea856")
+        self.assertEqual(_campaign_hash(md_campaign), "d4ce9225e23afe42d4c2a368f200cba95f36be05116795ab274b0ab2a0ecf144")
 
 
 if __name__ == "__main__":

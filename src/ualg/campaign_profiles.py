@@ -24,8 +24,7 @@ _FACTION_BLACK_SECT = 5
 _FACTION_GHORKOVS = 6
 _FACTION_TUTOR = 7
 _ROCK_SLED_VEHICLE_ID = 11
-_METROPOLIS_DAWN_PROFILE_IDS = {"md-ghorkov", "md-taerkasten"}
-_GENERATOR2_ROCK_SLED_EXCLUDED_FACTIONS = {"bla", _FACTION_BLACK_SECT}
+_GENERATOR2_ROCK_SLED_EXCLUDED_FACTIONS = {"res", "bla", _FACTION_PLAYER, _FACTION_BLACK_SECT}
 
 GENERATOR2_FACTION_IDS = {"res": 1, "sul": 2, "myk": 3, "tae": 4, "bla": 5, "gho": 6}
 GENERATOR2_FACTION_CODES_BY_ID = {faction_id: code for code, faction_id in GENERATOR2_FACTION_IDS.items()}
@@ -139,7 +138,7 @@ def _build_profile(generator: str, profile_id: str, spec: dict[str, Any]) -> Cam
     player_faction = spec.get("player_faction")
     if player_faction is None:
         raise ValueError(f"Profile {generator}/{profile_id} must define player_faction.")
-    roster = _apply_roster_exceptions(generator, profile_id, roster, player_faction)
+    roster = _apply_roster_exceptions(generator, roster)
     targets_by_level = _targets_by_level(spec, level_ids)
     player_vehicle = int(spec.get("player_vehicle", 0))
     player_robo_by_level = {int(level_id): int(vehicle) for level_id, vehicle in spec.get("player_robo_by_level", {}).items()}
@@ -210,25 +209,13 @@ def _build_generator2_roster(spec: dict[str, Any], profile: str) -> ProfileRoste
     )
 
 
-def _apply_roster_exceptions(
-    generator: str,
-    profile_id: str,
-    roster: ProfileRoster,
-    player_faction: Any,
-) -> ProfileRoster:
+def _apply_roster_exceptions(generator: str, roster: ProfileRoster) -> ProfileRoster:
     if generator != "generator2":
         return roster
 
     excluded = set(_GENERATOR2_ROCK_SLED_EXCLUDED_FACTIONS)
-    if profile_id in _METROPOLIS_DAWN_PROFILE_IDS and str(player_faction) != "res":
-        excluded.add("res")
-        excluded.add(_FACTION_PLAYER)
     if not excluded:
         return roster
-
-    if str(player_faction) == "res":
-        excluded.discard("res")
-        excluded.discard(_FACTION_PLAYER)
 
     vehicles = {
         faction: tuple(vehicle for vehicle in faction_vehicles if vehicle != _ROCK_SLED_VEHICLE_ID)

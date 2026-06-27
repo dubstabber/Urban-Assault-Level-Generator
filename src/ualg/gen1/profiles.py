@@ -6,6 +6,9 @@ from .context import _State
 from ..campaign_profiles import CampaignProfile, ProfileRegistry, default_profile_registry
 
 
+_RESISTANCE_CAMPAIGN_TECH_EXCLUDED_VEHICLES = {9, 11, 133, 134}
+
+
 class Generator1ProfileResolver:
     def __init__(self, registry: ProfileRegistry | None = None) -> None:
         self._registry = registry or default_profile_registry()
@@ -26,7 +29,7 @@ class Generator1ProfileResolver:
         profile = self.profile(campaign_profile)
         vehicles = list(profile.roster.vehicles_by_faction.get(profile.player_faction, ()))
         if profile.player_faction == 1:
-            return [vehicle for vehicle in vehicles if vehicle != 9]
+            return [vehicle for vehicle in vehicles if vehicle not in _RESISTANCE_CAMPAIGN_TECH_EXCLUDED_VEHICLES]
         return vehicles
 
     def player_tech_building_ids(self, campaign_profile: str) -> list[int]:
