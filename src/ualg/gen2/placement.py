@@ -9,6 +9,10 @@ from .map_builder import Generator2MapBuilder
 from ..constants import GENERATOR2_SCOUT_VEHICLES
 
 
+_MD_TAERKASTEN_SQUAD_EXCLUDED_FACTIONS = {"tae", "bla"}
+_MD_TAERKASTEN_SQUAD_EXCLUDED_VEHICLE_IDS = {143, 144}
+
+
 class Generator2PlacementPlanner:
     def __init__(self, map_builder: Generator2MapBuilder) -> None:
         self._map_builder = map_builder
@@ -78,7 +82,10 @@ class Generator2PlacementPlanner:
         if not coords:
             return
         faction = level.rng.choice(self._map_builder._present_factions(level))
-        vehicle = level.rng.choice(level.vehicles_by_faction[faction])
+        vehicles = self._squad_vehicle_candidates(level, faction)
+        if not vehicles:
+            return
+        vehicle = level.rng.choice(vehicles)
         if vehicle in GENERATOR2_SCOUT_VEHICLES:
             squad_size = 1
         else:
@@ -93,3 +100,10 @@ class Generator2PlacementPlanner:
             "x": coords["x"],
             "y": coords["y"],
         })
+
+    @staticmethod
+    def _squad_vehicle_candidates(level: _Level, faction: str) -> list[int]:
+        vehicles = list(level.vehicles_by_faction[faction])
+        if level.campaign_profile == "md-taerkasten" and faction in _MD_TAERKASTEN_SQUAD_EXCLUDED_FACTIONS:
+            return [vehicle for vehicle in vehicles if vehicle not in _MD_TAERKASTEN_SQUAD_EXCLUDED_VEHICLE_IDS]
+        return vehicles

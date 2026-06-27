@@ -7,6 +7,7 @@ from ..campaign_profiles import CampaignProfile, ProfileRegistry, default_profil
 
 
 _RESISTANCE_CAMPAIGN_TECH_EXCLUDED_VEHICLES = {9, 11, 133, 134}
+_MD_TAERKASTEN_CAMPAIGN_TECH_EXCLUDED_VEHICLES = {143, 144}
 
 
 class Generator1ProfileResolver:
@@ -30,6 +31,8 @@ class Generator1ProfileResolver:
         vehicles = list(profile.roster.vehicles_by_faction.get(profile.player_faction, ()))
         if profile.player_faction == 1:
             return [vehicle for vehicle in vehicles if vehicle not in _RESISTANCE_CAMPAIGN_TECH_EXCLUDED_VEHICLES]
+        if profile.profile_id == "md-taerkasten" and profile.player_faction == 4:
+            return [vehicle for vehicle in vehicles if vehicle not in _MD_TAERKASTEN_CAMPAIGN_TECH_EXCLUDED_VEHICLES]
         return vehicles
 
     def player_tech_building_ids(self, campaign_profile: str) -> list[int]:

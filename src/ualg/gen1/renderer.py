@@ -16,6 +16,7 @@ from ..constants import (
     FACTION_BLACK_SECT,
     FACTION_PLAYER,
     FACTION_SULGOGARS,
+    FACTION_TAERKASTEN,
     FACTION_TUTOR,
     HOST_VEHICLE_BY_FACTION,
     SKY_OPTIONS,
@@ -25,12 +26,15 @@ from ..constants import (
     sector_to_world_z,
 )
 from ..ldf import LDFWriter
+from ..startup_scripts import startup_include_for_level
 
 
 _ROCK_SLED_VEHICLE_ID = 11
 _SPECIAL_RESISTANCE_VEHICLE_IDS = {133, 134}
 _CAMPAIGN_ENABLE_EXCLUDED_FACTIONS = {FACTION_PLAYER, FACTION_BLACK_SECT}
 _CAMPAIGN_ENABLE_EXCLUDED_VEHICLE_IDS = {_ROCK_SLED_VEHICLE_ID, *_SPECIAL_RESISTANCE_VEHICLE_IDS}
+_MD_TAERKASTEN_ENABLE_EXCLUDED_FACTIONS = {FACTION_TAERKASTEN, FACTION_BLACK_SECT}
+_MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS = {143, 144}
 
 
 class Generator1Renderer:
@@ -218,7 +222,7 @@ class Generator1Renderer:
         writer.line(";------------------------------------------------------------")
         writer.line(";--- Prototype Modifications                             ---")
         writer.line(";------------------------------------------------------------")
-        writer.line("include data:scripts/startup2.scr")
+        writer.line(startup_include_for_level(state.campaign_profile, state.level_id))
         writer.line("")
         writer.line(";------------------------------------------------------------")
         writer.line(";--- Prototype Enabling                                   ---")
@@ -230,7 +234,8 @@ class Generator1Renderer:
                 self._write_enable_block(writer, state, faction)
 
     def _write_enable_block(self, writer: LDFWriter, state: _State, faction: int) -> None:
-        vehicles, buildings = self._enabled_vehicles(state, faction), self._enabled_buildings(state, faction)
+        vehicles = self._filter_profile_enabled_vehicles(state, faction, self._enabled_vehicles(state, faction))
+        buildings = self._enabled_buildings(state, faction)
         if not vehicles and not buildings:
             return
         writer.line(f"begin_enable\t{faction}" if faction == state.player_faction else f"begin_enable {faction}")
@@ -286,6 +291,12 @@ class Generator1Renderer:
             for vehicle in state.vehicles_by_faction.get(faction, [])
             if vehicle not in _CAMPAIGN_ENABLE_EXCLUDED_VEHICLE_IDS
         ][:1]
+
+    @staticmethod
+    def _filter_profile_enabled_vehicles(state: _State, faction: int, enabled: list[int]) -> list[int]:
+        if state.campaign_profile == "md-taerkasten" and faction in _MD_TAERKASTEN_ENABLE_EXCLUDED_FACTIONS:
+            return [vehicle for vehicle in enabled if vehicle not in _MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS]
+        return enabled
 
     def _enabled_buildings(self, state: _State, faction: int) -> list[int]:
         if faction in state.forced_enabled_buildings:

@@ -58,7 +58,7 @@ class CharacterizationTests(unittest.TestCase):
         md_campaign = Generator1().generate_campaign(seed=1234, campaign_profile="md-ghorkov")
 
         self.assertEqual(_campaign_hash(campaign), "f93afc3fae8a40e88c6c2aaf82b612013dda07f4cca4b338fe82353a5fd61bf1")
-        self.assertEqual(_campaign_hash(md_campaign), "f5299e797649c62945e4cb6150d4b1ce886b78b563b64ccb3f7908a49ef760b6")
+        self.assertEqual(_campaign_hash(md_campaign), "905e9472caad0502003a378d03f9e6add6831f98acb1b4fef0b51b0e7db2f3c0")
 
     def test_generator2_seeded_outputs(self) -> None:
         single = Generator2().generate_single(seed=112233, level_id=1)
@@ -67,7 +67,7 @@ class CharacterizationTests(unittest.TestCase):
 
         self.assertEqual(_text_hash(single.text), "ab9f5be7cb6195a031a9ee4df12948a2cf340aaea37677e23539768cb0944118")
         self.assertEqual(_campaign_hash(campaign), "b2835debf2ab47804db65a91b0f26423998ca0dc1610329c9f67149e0df36174")
-        self.assertEqual(_campaign_hash(md_campaign), "25062d73d5a1436c1acffd502087ffd716787c9103e4164812134317016fa4d7")
+        self.assertEqual(_campaign_hash(md_campaign), "ecfd17c9ad8dea2e27a9d8f1b006ac9c5a3fd28947b95b7bfa76d264643ed1fc")
 
 
 if __name__ == "__main__":

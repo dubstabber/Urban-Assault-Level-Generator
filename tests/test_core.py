@@ -59,6 +59,12 @@ from ualg.gen2.context import _Level as Generator2Level
 from ualg.gen2.map_builder import Generator2MapBuilder
 from ualg.ldf import parse_maps
 from ualg.rng import MSVCRTRandom
+from ualg.startup_scripts import (
+    DEFAULT_STARTUP_INCLUDE,
+    MD_FIRST_LEVEL_STARTUP_INCLUDE,
+    MD_GHORKOV_STARTUP_INCLUDE,
+    MD_TAERKASTEN_STARTUP_INCLUDE,
+)
 
 
 GENERATOR2_ENEMY_STATION_DELAY_KEYS = (
@@ -73,6 +79,7 @@ GENERATOR2_ENEMY_STATION_DELAY_KEYS = (
 )
 RADAR_BUDGET_KEYS = ("rad_budget",)
 CAMPAIGN_ENABLE_EXCLUDED_VEHICLE_IDS = {11, 133, 134}
+MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS = {143, 144}
 ROCK_SLED_VEHICLE_ID = 11
 
 
@@ -160,6 +167,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual([level.filename for level in campaign.levels], expected_filenames)
         self.assertEqual(len(campaign.levels), 16)
         self._assert_metropolis_dawn_mission_maps(campaign.levels)
+        self._assert_metropolis_dawn_startup_includes(campaign.levels, 7, MD_GHORKOV_STARTUP_INCLUDE)
         by_id = {level.level_id: level for level in campaign.levels}
         for level_id, targets in GENERATOR1_MD_CAMPAIGN_TARGETS_BY_PROFILE["md-ghorkov"].items():
             self.assertEqual(self._gate_targets(by_id[level_id].text), targets)
@@ -182,6 +190,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual([level.filename for level in campaign.levels], expected_filenames)
         self.assertEqual(len(campaign.levels), 15)
         self._assert_metropolis_dawn_mission_maps(campaign.levels)
+        self._assert_metropolis_dawn_startup_includes(campaign.levels, 6, MD_TAERKASTEN_STARTUP_INCLUDE)
         by_id = {level.level_id: level for level in campaign.levels}
         for level_id, targets in GENERATOR1_MD_CAMPAIGN_TARGETS_BY_PROFILE["md-taerkasten"].items():
             self.assertEqual(self._gate_targets(by_id[level_id].text), targets)
@@ -191,6 +200,31 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(sum(1 for owner, _vehicle in owner_vehicles if owner == 4), 1)
         self.assertIn((1, 56), self._robo_owner_vehicles(by_id[45].text))
         self._assert_resistance_campaign_blocked_vehicles_not_enabled(campaign.levels)
+        self._assert_vehicle_ids_not_enabled(
+            campaign.levels,
+            FACTION_TAERKASTEN,
+            "Taerkasten",
+            MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS,
+        )
+        self._assert_vehicle_ids_not_enabled(
+            campaign.levels,
+            FACTION_BLACK_SECT,
+            "Black Sect",
+            MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS,
+        )
+        self._assert_vehicle_ids_not_used_by_squads(
+            campaign.levels,
+            FACTION_TAERKASTEN,
+            "Taerkasten",
+            MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS,
+        )
+        self._assert_vehicle_ids_not_used_by_squads(
+            campaign.levels,
+            FACTION_BLACK_SECT,
+            "Black Sect",
+            MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS,
+        )
+        self._assert_tech_vehicle_ids_not_used(campaign.levels, MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS)
 
     def test_generator1_typ_map_policy(self) -> None:
         improved = Generator1().generate_single(seed=424242, difficulty=5, skill=6)
@@ -496,6 +530,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual([level.level_id for level in campaign.levels], expected_ids)
         self.assertEqual(len(campaign.levels), 16)
         self._assert_metropolis_dawn_mission_maps(campaign.levels)
+        self._assert_metropolis_dawn_startup_includes(campaign.levels, 7, MD_GHORKOV_STARTUP_INCLUDE)
         by_id = {level.level_id: level for level in campaign.levels}
         for level_id, targets in GENERATOR2_MD_CAMPAIGN_TARGETS_BY_PROFILE["md-ghorkov"].items():
             self.assertEqual(self._gate_targets(by_id[level_id].text), targets)
@@ -516,6 +551,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual([level.level_id for level in campaign.levels], expected_ids)
         self.assertEqual(len(campaign.levels), 15)
         self._assert_metropolis_dawn_mission_maps(campaign.levels)
+        self._assert_metropolis_dawn_startup_includes(campaign.levels, 6, MD_TAERKASTEN_STARTUP_INCLUDE)
         by_id = {level.level_id: level for level in campaign.levels}
         for level_id, targets in GENERATOR2_MD_CAMPAIGN_TARGETS_BY_PROFILE["md-taerkasten"].items():
             self.assertEqual(self._gate_targets(by_id[level_id].text), targets)
@@ -528,6 +564,30 @@ class CoreTests(unittest.TestCase):
         self._assert_resistance_ai_rock_sled_not_used_by_squads(campaign.levels)
         self._assert_black_sect_campaign_blocked_vehicles_not_enabled(campaign.levels)
         self._assert_black_sect_rock_sled_not_used_by_squads(campaign.levels)
+        self._assert_vehicle_ids_not_enabled(
+            campaign.levels,
+            FACTION_TAERKASTEN,
+            "Taerkasten",
+            MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS,
+        )
+        self._assert_vehicle_ids_not_enabled(
+            campaign.levels,
+            FACTION_BLACK_SECT,
+            "Black Sect",
+            MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS,
+        )
+        self._assert_vehicle_ids_not_used_by_squads(
+            campaign.levels,
+            FACTION_TAERKASTEN,
+            "Taerkasten",
+            MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS,
+        )
+        self._assert_vehicle_ids_not_used_by_squads(
+            campaign.levels,
+            FACTION_BLACK_SECT,
+            "Black Sect",
+            MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS,
+        )
 
     def test_generator2_typ_map_uses_legacy_set_list(self) -> None:
         for values in GENERATOR2_SET_LIST.values():
@@ -865,9 +925,21 @@ class CoreTests(unittest.TestCase):
             if not vehicles:
                 continue
             found_enable = True
-            blocked = sorted(CAMPAIGN_ENABLE_EXCLUDED_VEHICLE_IDS.intersection(vehicles))
-            self.assertFalse(blocked, f"Blocked vehicles {blocked} enabled for {faction_name} in level {level.level_id}")
+            self._assert_no_blocked_enable_vehicles(level, vehicles, CAMPAIGN_ENABLE_EXCLUDED_VEHICLE_IDS, faction_name)
         self.assertTrue(found_enable)
+
+    def _assert_vehicle_ids_not_enabled(self, levels, owner: int, faction_name: str, vehicle_ids: set[int]) -> None:
+        for level in levels:
+            self._assert_no_blocked_enable_vehicles(
+                level,
+                self._enable_vehicle_values(level.text, owner),
+                vehicle_ids,
+                faction_name,
+            )
+
+    def _assert_no_blocked_enable_vehicles(self, level, vehicles: list[int], vehicle_ids: set[int], faction_name: str) -> None:
+        blocked = sorted(vehicle_ids.intersection(vehicles))
+        self.assertFalse(blocked, f"Blocked vehicles {blocked} enabled for {faction_name} in level {level.level_id}")
 
     def _assert_resistance_ai_rock_sled_not_used_by_squads(self, levels) -> None:
         self._assert_ai_rock_sled_not_used_by_squads(levels, FACTION_PLAYER, "Resistance")
@@ -888,6 +960,18 @@ class CoreTests(unittest.TestCase):
                 f"Rock Sled used by {faction_name} AI squad in level {level.level_id}",
             )
         self.assertTrue(found_squad)
+
+    def _assert_vehicle_ids_not_used_by_squads(
+        self,
+        levels,
+        owner: int,
+        faction_name: str,
+        vehicle_ids: set[int],
+    ) -> None:
+        for level in levels:
+            vehicles = self._block_vehicle_values(level.text, "begin_squad", owner)
+            blocked = sorted(vehicle_ids.intersection(vehicles))
+            self.assertFalse(blocked, f"Blocked squad vehicles {blocked} used by {faction_name} in level {level.level_id}")
 
     def _assert_tech_vehicle_ids_not_used(self, levels, vehicle_ids: set[int]) -> None:
         for level in levels:
@@ -1009,6 +1093,17 @@ class CoreTests(unittest.TestCase):
             self.assertEqual(briefing_map.lower(), f"mb_{level.level_id:02d}.iff")
             self.assertEqual(debriefing_map.lower(), briefing_map.lower())
             self.assertIn(briefing_map.lower(), briefing_maps)
+
+    def _assert_metropolis_dawn_startup_includes(self, levels, first_level_id: int, campaign_startup_include: str) -> None:
+        for level in levels:
+            expected = MD_FIRST_LEVEL_STARTUP_INCLUDE if level.level_id == first_level_id else campaign_startup_include
+            startup_lines = [
+                line.strip()
+                for line in level.text.splitlines()
+                if line.strip().startswith("include ") and "startup" in line
+            ]
+            self.assertEqual(startup_lines, [expected])
+            self.assertNotIn(DEFAULT_STARTUP_INCLUDE, startup_lines)
 
     @staticmethod
     def _dedupe(values: list[int]) -> list[int]:

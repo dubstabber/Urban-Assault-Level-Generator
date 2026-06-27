@@ -8,10 +8,13 @@ from .context import _Level
 from .map_builder import Generator2MapBuilder
 from ..constants import GENERATOR2_FACTION_IDS, GENERATOR2_SKIES, TILESET6_BOMB_BLUEPRINTS
 from ..ldf import LDFWriter
+from ..startup_scripts import startup_include_for_level
 
 
 _CAMPAIGN_ENABLE_EXCLUDED_FACTIONS = {"res", "bla"}
 _CAMPAIGN_ENABLE_EXCLUDED_VEHICLE_IDS = {11, 133, 134}
+_MD_TAERKASTEN_ENABLE_EXCLUDED_FACTIONS = {"tae", "bla"}
+_MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS = {143, 144}
 
 
 class Generator2Renderer:
@@ -180,7 +183,7 @@ class Generator2Renderer:
     def _write_prototypes(self, writer: LDFWriter, level: _Level) -> None:
         writer.line("; Prototype Modifications")
         writer.line("")
-        writer.line("include data:scripts/startup2.scr")
+        writer.line(startup_include_for_level(level.campaign_profile, level.level_id))
         for faction in self._map_builder._present_factions(level):
             writer.line("")
             writer.line(f"begin_enable {GENERATOR2_FACTION_IDS[faction]}")
@@ -194,6 +197,8 @@ class Generator2Renderer:
     @staticmethod
     def _enabled_vehicles(level: _Level, faction: str) -> list[int]:
         vehicles = list(level.vehicles_by_faction[faction])
+        if level.campaign_profile == "md-taerkasten" and faction in _MD_TAERKASTEN_ENABLE_EXCLUDED_FACTIONS:
+            vehicles = [vehicle for vehicle in vehicles if vehicle not in _MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS]
         if faction not in _CAMPAIGN_ENABLE_EXCLUDED_FACTIONS:
             return vehicles
         return [vehicle for vehicle in vehicles if vehicle not in _CAMPAIGN_ENABLE_EXCLUDED_VEHICLE_IDS]
