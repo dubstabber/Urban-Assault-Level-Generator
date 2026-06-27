@@ -36,6 +36,8 @@ from ualg.constants import (
     TYP_MAP_INTERIOR_LOOKUP,
     TYP_PLAYER_BASE,
     TYP_SUPERITEM,
+    TYP_TILESET6_BOMB,
+    TILESET6_BOMB_BLUEPRINTS,
 )
 from ualg.data import (
     UA_METROPOLIS_DAWN_PROFILE,
@@ -571,14 +573,24 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(generator.random_x_calls, generator.random_y_calls)
 
     def test_generator2_special_cells_match_maps(self) -> None:
-        for seed in range(1, 25):
+        found_tileset6_bomb = False
+        for seed in (*range(1, 25), 26):
             level = Generator2().generate_single(seed=seed, level_id=1)
             maps = parse_maps(level.text)
             typ = maps["typ_map"][2]
             blg = maps["blg_map"][2]
+            item_cells = {
+                (
+                    int(self._property_values(block, "sec_x")[0]),
+                    int(self._property_values(block, "sec_y")[0]),
+                )
+                for block in self._blocks(level.text, "begin_item")
+            }
 
             for y in range(1, level.height - 1):
                 for x in range(1, level.width - 1):
+                    if (x, y) in item_cells:
+                        continue
                     if blg[y][x] in BUILDING_TYP_BY_ID:
                         self.assertEqual(typ[y][x], BUILDING_TYP_BY_ID[blg[y][x]])
 
@@ -591,11 +603,20 @@ class CoreTests(unittest.TestCase):
             for block in self._blocks(level.text, "begin_item"):
                 x = int(self._property_values(block, "sec_x")[0])
                 y = int(self._property_values(block, "sec_y")[0])
-                self.assertEqual(typ[y][x], TYP_SUPERITEM)
+                item_blueprints = (
+                    int(self._property_values(block, "inactive_bp")[0]),
+                    int(self._property_values(block, "active_bp")[0]),
+                    int(self._property_values(block, "trigger_bp")[0]),
+                )
+                uses_tileset6_bomb_bp = level.tileset == 6 and item_blueprints == TILESET6_BOMB_BLUEPRINTS
+                expected_typ = TYP_TILESET6_BOMB if uses_tileset6_bomb_bp else TYP_SUPERITEM
+                self.assertEqual(typ[y][x], expected_typ)
+                found_tileset6_bomb = found_tileset6_bomb or uses_tileset6_bomb_bp
                 self.assertEqual(blg[y][x], BLG_SUPERITEM)
                 for key_x, key_y in self._keysec_pairs(block):
                     self.assertIn(typ[key_y][key_x], {TYP_GATE_CLOSED_1, TYP_GATE_CLOSED_2})
                     self.assertEqual(blg[key_y][key_x], 0)
+        self.assertTrue(found_tileset6_bomb)
 
     def test_generator2_squad_blocks_do_not_emit_mb_status(self) -> None:
         found_squad = False

@@ -6,7 +6,7 @@ from math import floor
 
 from .context import _Level
 from .map_builder import Generator2MapBuilder
-from ..constants import GENERATOR2_FACTION_IDS, GENERATOR2_SKIES
+from ..constants import GENERATOR2_FACTION_IDS, GENERATOR2_SKIES, TILESET6_BOMB_BLUEPRINTS
 from ..ldf import LDFWriter
 
 
@@ -148,13 +148,14 @@ class Generator2Renderer:
         writer.line("")
         writer.line("; Stoudson Bomb")
         for bomb in level.bombs:
+            inactive_bp, active_bp, trigger_bp = TILESET6_BOMB_BLUEPRINTS if level.tileset == 6 else (35, 36, 36)
             writer.line("")
             writer.line("begin_item")
             writer.property("sec_x", bomb["x"])
             writer.property("sec_y", bomb["y"])
-            writer.property("inactive_bp", 68 if level.tileset == 6 else 35)
-            writer.property("active_bp", 69 if level.tileset == 6 else 36)
-            writer.property("trigger_bp", 70 if level.tileset == 6 else 36)
+            writer.property("inactive_bp", inactive_bp)
+            writer.property("active_bp", active_bp)
+            writer.property("trigger_bp", trigger_bp)
             writer.property("type", 1)
             writer.property("countdown", bomb["timeout"])
             for key in bomb["keys"]:

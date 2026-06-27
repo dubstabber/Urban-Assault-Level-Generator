@@ -17,6 +17,7 @@ from ..constants import (
     TYP_GATE_CLOSED_2,
     TYP_PLAYER_BASE,
     TYP_SUPERITEM,
+    TYP_TILESET6_BOMB,
 )
 from ..models import MapRows
 
@@ -98,7 +99,8 @@ class Generator2MapBuilder:
             self._set_map_cell(level, "blg", gate["x"], gate["y"], BLG_PLAYER_BASE)
 
         for bomb in level.bombs:
-            self._set_map_cell(level, "typ", bomb["x"], bomb["y"], TYP_SUPERITEM)
+            bomb_typ = TYP_TILESET6_BOMB if level.tileset == 6 else TYP_SUPERITEM
+            self._set_map_cell(level, "typ", bomb["x"], bomb["y"], bomb_typ)
             self._set_map_cell(level, "blg", bomb["x"], bomb["y"], BLG_SUPERITEM)
             for key in bomb["keys"]:
                 key_typ = TYP_GATE_CLOSED_1 if level.rng.rand_range(0, 1) else TYP_GATE_CLOSED_2

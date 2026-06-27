@@ -66,8 +66,8 @@ class CharacterizationTests(unittest.TestCase):
         md_campaign = Generator2().generate_campaign(seed=998877, campaign_profile="md-taerkasten")
 
         self.assertEqual(_text_hash(single.text), "ab9f5be7cb6195a031a9ee4df12948a2cf340aaea37677e23539768cb0944118")
-        self.assertEqual(_campaign_hash(campaign), "49871a8d83d8577cd0bff298c20f1656a512f33a712c7f9fc6cdf83eac6ea856")
-        self.assertEqual(_campaign_hash(md_campaign), "d4ce9225e23afe42d4c2a368f200cba95f36be05116795ab274b0ab2a0ecf144")
+        self.assertEqual(_campaign_hash(campaign), "b2835debf2ab47804db65a91b0f26423998ca0dc1610329c9f67149e0df36174")
+        self.assertEqual(_campaign_hash(md_campaign), "25062d73d5a1436c1acffd502087ffd716787c9103e4164812134317016fa4d7")
 
 
 if __name__ == "__main__":
