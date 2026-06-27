@@ -74,6 +74,7 @@ from .gui_support.legacy_dialogs import (
 from .gui_support.settings import (
     DEFAULT_SETTINGS_FILE,
     FILE_SECTION,
+    GENERATOR1_SECTION,
     GENERATOR2_SECTION,
     RLG_SECTION,
     UA_SECTION,
@@ -105,6 +106,7 @@ __all__ = [
     "DLU_Y",
     "ENABLE_ALL_CONTROL_IDS",
     "FILE_SECTION",
+    "GENERATOR1_SECTION",
     "GENERATOR2_SECTION",
     "GHORKOV_HOST_VEHICLE_ALIASES",
     "GHORKOV_HOST_VEHICLES",

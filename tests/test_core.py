@@ -69,6 +69,7 @@ GENERATOR2_ENEMY_STATION_DELAY_KEYS = (
     "saf_delay",
     "cpl_delay",
 )
+RADAR_BUDGET_KEYS = ("rad_budget",)
 
 
 class CoreTests(unittest.TestCase):
@@ -215,6 +216,27 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(first.text, second.text)
         self.assertNotEqual(first.text, third.text)
 
+    def test_generator1_zero_enemy_radar_budgets_only_changes_rad_budget_values(self) -> None:
+        normal = Generator1().generate_single(seed=424242, difficulty=5, skill=6)
+        zeroed = Generator1().generate_single(
+            seed=424242,
+            difficulty=5,
+            skill=6,
+            zero_enemy_radar_budgets=True,
+        )
+
+        self.assertNotEqual(normal.text, zeroed.text)
+        self.assertEqual(self._zero_property_values(normal.text, RADAR_BUDGET_KEYS), zeroed.text)
+        self._assert_enemy_radar_budgets_zero(zeroed.text)
+
+    def test_generator1_campaign_zero_enemy_radar_budgets(self) -> None:
+        campaign = Generator1().generate_campaign(seed=13579, difficulty=5, zero_enemy_radar_budgets=True)
+
+        found_budget_block = False
+        for level in campaign.levels:
+            found_budget_block = self._assert_enemy_radar_budgets_zero(level.text) or found_budget_block
+        self.assertTrue(found_budget_block)
+
     def test_generator1_custom_options_affect_output(self) -> None:
         level = Generator1().generate_custom(
             Generator1CustomOptions(
@@ -249,6 +271,19 @@ class CoreTests(unittest.TestCase):
         self.assertIn("\tbuilding = 52", level.text)
         gate_keys = self._keysec_pairs(self._blocks(level.text, "begin_gate")[0])
         self.assertEqual(len(gate_keys), 3)
+
+    def test_generator1_custom_zero_enemy_radar_budgets(self) -> None:
+        level = Generator1().generate_custom(
+            Generator1CustomOptions(
+                seed=424242,
+                width=12,
+                height=10,
+                zero_enemy_radar_budgets=True,
+                ai_slot_present={FACTION_GHORKOVS: [True, False, False]},
+            )
+        )
+
+        self._assert_enemy_radar_budgets_zero(level.text)
 
     def test_generator1_custom_supports_per_slot_ghorkov_host_vehicles(self) -> None:
         level = Generator1().generate_custom(
@@ -405,6 +440,14 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(self._zero_generator2_delay_values(normal.text), zeroed.text)
         self._assert_generator2_enemy_station_delays_zero(zeroed.text)
 
+    def test_generator2_zero_enemy_radar_budgets_only_changes_rad_budget_values(self) -> None:
+        normal = Generator2().generate_single(seed=112233, level_id=1)
+        zeroed = Generator2().generate_single(seed=112233, level_id=1, zero_enemy_radar_budgets=True)
+
+        self.assertNotEqual(normal.text, zeroed.text)
+        self.assertEqual(self._zero_property_values(normal.text, RADAR_BUDGET_KEYS), zeroed.text)
+        self._assert_enemy_radar_budgets_zero(zeroed.text)
+
     def test_generator2_campaign_zero_enemy_station_delays(self) -> None:
         campaign = Generator2().generate_campaign(seed=998877, zero_enemy_station_delays=True)
 
@@ -412,6 +455,14 @@ class CoreTests(unittest.TestCase):
         for level in campaign.levels:
             found_delay_block = self._assert_generator2_enemy_station_delays_zero(level.text) or found_delay_block
         self.assertTrue(found_delay_block)
+
+    def test_generator2_campaign_zero_enemy_radar_budgets(self) -> None:
+        campaign = Generator2().generate_campaign(seed=998877, zero_enemy_radar_budgets=True)
+
+        found_budget_block = False
+        for level in campaign.levels:
+            found_budget_block = self._assert_enemy_radar_budgets_zero(level.text) or found_budget_block
+        self.assertTrue(found_budget_block)
 
     def test_generator2_campaign_graph(self) -> None:
         campaign = Generator2().generate_campaign(seed=998877)
@@ -549,7 +600,19 @@ class CoreTests(unittest.TestCase):
         env = {**os.environ, "PYTHONPATH": str(SRC), "PYTHONDONTWRITEBYTECODE": "1"}
         try:
             result = subprocess.run(
-                [sys.executable, "-B", "-m", "ualg.cli", "gen1", "single", "--seed", "1234", "--output", str(gen1_output)],
+                [
+                    sys.executable,
+                    "-B",
+                    "-m",
+                    "ualg.cli",
+                    "gen1",
+                    "single",
+                    "--seed",
+                    "1234",
+                    "--zero-enemy-radar-budgets",
+                    "--output",
+                    str(gen1_output),
+                ],
                 cwd=ROOT,
                 env=env,
                 text=True,
@@ -558,10 +621,24 @@ class CoreTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue(gen1_output.exists())
-            self.assertIn("begin_level", gen1_output.read_text(encoding="utf-8"))
+            gen1_text = gen1_output.read_text(encoding="utf-8")
+            self.assertIn("begin_level", gen1_text)
+            self.assertTrue(self._assert_enemy_radar_budgets_zero(gen1_text))
 
             result = subprocess.run(
-                [sys.executable, "-B", "-m", "ualg.cli", "gen1", "campaign", "--seed", "1234", "--output-dir", str(gen1_campaign)],
+                [
+                    sys.executable,
+                    "-B",
+                    "-m",
+                    "ualg.cli",
+                    "gen1",
+                    "campaign",
+                    "--seed",
+                    "1234",
+                    "--zero-enemy-radar-budgets",
+                    "--output-dir",
+                    str(gen1_campaign),
+                ],
                 cwd=ROOT,
                 env=env,
                 text=True,
@@ -611,6 +688,7 @@ class CoreTests(unittest.TestCase):
                     "--level-id",
                     "1",
                     "--zero-enemy-station-delays",
+                    "--zero-enemy-radar-budgets",
                     "--output",
                     str(gen2_output),
                 ],
@@ -625,6 +703,7 @@ class CoreTests(unittest.TestCase):
             gen2_text = gen2_output.read_text(encoding="utf-8")
             self.assertIn("begin_level", gen2_text)
             self.assertTrue(self._assert_generator2_enemy_station_delays_zero(gen2_text))
+            self.assertTrue(self._assert_enemy_radar_budgets_zero(gen2_text))
 
             result = subprocess.run(
                 [
@@ -638,6 +717,7 @@ class CoreTests(unittest.TestCase):
                     "1234",
                     "--campaign-profile",
                     "md-taerkasten",
+                    "--zero-enemy-radar-budgets",
                     "--output-dir",
                     str(gen2_md_campaign),
                 ],
@@ -768,15 +848,25 @@ class CoreTests(unittest.TestCase):
             self.assertEqual(set(values), {"0"})
         return found_delay_block
 
+    def _assert_enemy_radar_budgets_zero(self, text: str) -> bool:
+        found_budget_block = False
+        for block in self._blocks(text, "begin_robo"):
+            values = self._property_values(block, "rad_budget")
+            if not values:
+                continue
+            found_budget_block = True
+            self.assertEqual(set(values), {"0"})
+        return found_budget_block
+
     @staticmethod
-    def _zero_generator2_delay_values(text: str) -> str:
+    def _zero_property_values(text: str, keys: tuple[str, ...]) -> str:
         result: list[str] = []
         for line in text.splitlines(keepends=True):
             if "=" not in line:
                 result.append(line)
                 continue
             key = line.split("=", 1)[0].strip()
-            if key not in GENERATOR2_ENEMY_STATION_DELAY_KEYS:
+            if key not in keys:
                 result.append(line)
                 continue
             if line.endswith("\r\n"):
@@ -788,8 +878,14 @@ class CoreTests(unittest.TestCase):
             else:
                 body = line
                 newline = ""
-            result.append(f"{body.split('=', 1)[0]}= 0{newline}")
+            prefix, value = body.split("=", 1)
+            leading = value[: len(value) - len(value.lstrip())]
+            result.append(f"{prefix}={leading}0{newline}")
         return "".join(result)
+
+    @staticmethod
+    def _zero_generator2_delay_values(text: str) -> str:
+        return CoreTests._zero_property_values(text, GENERATOR2_ENEMY_STATION_DELAY_KEYS)
 
     def _assert_metropolis_dawn_mission_maps(self, levels) -> None:
         briefing_maps = {name.lower() for name in ua_mission_briefing_maps(UA_METROPOLIS_DAWN_PROFILE)}

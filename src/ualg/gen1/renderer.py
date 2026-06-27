@@ -199,6 +199,8 @@ class Generator1Renderer:
                 "pow_budget": 20, "pow_delay": 0, "rad_budget": 20, "rad_delay": 0,
                 "saf_budget": 20, "saf_delay": 0, "cpl_budget": 80, "cpl_delay": 50000,
             }
+        if state.zero_enemy_radar_budgets:
+            values["rad_budget"] = 0
         for key, value in values.items():
             writer.property(key, value)
         if faction != FACTION_TUTOR and state.difficulty >= 6:

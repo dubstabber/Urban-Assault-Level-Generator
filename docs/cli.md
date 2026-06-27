@@ -39,6 +39,7 @@ ualg gen1 single --seed 12345 --difficulty 5 --skill 6 --output out/L0101.ldf
 | `--difficulty DIFFICULTY` | No | `5` | Integer difficulty used by the difficulty scenario when `--skill` is `0`. |
 | `--skill SKILL` | No | `0` | Scenario category selector. Nonzero values are clamped to categories `1` through `11`; `0` uses the difficulty-based scenario. |
 | `--strict-parity` | No | Off | Disable improved tileset filtering and use the stricter recovered parity behavior. |
+| `--zero-enemy-radar-budgets` | No | Off | Set all enemy host station `rad_budget` values to `0`. |
 | `--output OUTPUT` | Yes | None | Output `.ldf` file path. Parent directories are created automatically. |
 
 ## Generator1 Campaign
@@ -55,6 +56,7 @@ ualg gen1 campaign --seed 12345 --campaign-profile original --output-dir out/gen
 | `--difficulty DIFFICULTY` | No | `5` | Integer difficulty passed into each generated level. |
 | `--strict-parity` | No | Off | Disable improved tileset filtering and use the stricter recovered parity behavior. |
 | `--campaign-profile {original,md-ghorkov,md-taerkasten}` | No | `original` | Campaign roster/profile to generate. |
+| `--zero-enemy-radar-budgets` | No | Off | Set all enemy host station `rad_budget` values to `0`. |
 | `--output-dir OUTPUT_DIR` | Yes | None | Directory where campaign `.ldf` files are written. The directory is created automatically. |
 
 Built-in profile sizes:
@@ -78,6 +80,7 @@ ualg gen2 single --seed 12345 --level-id 1 --output out/L0101.ldf
 | `--seed SEED` | No | `0` | Integer RNG seed. `0` uses the current time. |
 | `--level-id LEVEL_ID` | No | `1` | Original Generator2 campaign level ID to generate. |
 | `--zero-enemy-station-delays` | No | Off | Set all enemy host station `*_delay` values to `0`. |
+| `--zero-enemy-radar-budgets` | No | Off | Set all enemy host station `rad_budget` values to `0`. |
 | `--output OUTPUT` | Yes | None | Output `.ldf` file path. Parent directories are created automatically. |
 
 Valid `--level-id` values are the original Generator2 campaign IDs:
@@ -103,6 +106,7 @@ ualg gen2 campaign --seed 12345 --campaign-profile original --output-dir out/gen
 | `--seed SEED` | No | `0` | Integer RNG seed. `0` uses the current time. |
 | `--campaign-profile {original,md-ghorkov,md-taerkasten}` | No | `original` | Campaign roster/profile to generate. |
 | `--zero-enemy-station-delays` | No | Off | Set all enemy host station `*_delay` values to `0`. |
+| `--zero-enemy-radar-budgets` | No | Off | Set all enemy host station `rad_budget` values to `0`. |
 | `--output-dir OUTPUT_DIR` | Yes | None | Directory where campaign `.ldf` files are written. The directory is created automatically. |
 
 Built-in profile sizes:

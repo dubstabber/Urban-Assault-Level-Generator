@@ -36,9 +36,17 @@ class Generator1:
         difficulty: int = 5,
         skill: int = 0,
         improved: bool = True,
+        *,
+        zero_enemy_radar_budgets: bool = False,
     ) -> GeneratedLevel:
         seed = self._normalize_seed(seed)
-        state = _State(rng=MSVCRTRandom(seed), seed=seed, difficulty=difficulty, improved=improved)
+        state = _State(
+            rng=MSVCRTRandom(seed),
+            seed=seed,
+            difficulty=difficulty,
+            improved=improved,
+            zero_enemy_radar_budgets=zero_enemy_radar_budgets,
+        )
         state.scenario_category = self.scenario.category_for_skill(skill) if skill else 0
         state.emit_player_enablement = True
         state.gate_target_level_id = 0
@@ -50,6 +58,8 @@ class Generator1:
         difficulty: int = 5,
         improved: bool = True,
         campaign_profile: str = "original",
+        *,
+        zero_enemy_radar_budgets: bool = False,
     ) -> GeneratedCampaign:
         campaign_profile = self.profiles.normalize_campaign_profile(campaign_profile)
         seed = self._normalize_seed(seed)
@@ -63,7 +73,13 @@ class Generator1:
             vehicle_flags[2] = True
         levels: list[GeneratedLevel] = []
         for i, filename in enumerate(filenames):
-            state = _State(rng=rng, seed=rng.state, difficulty=difficulty, improved=improved)
+            state = _State(
+                rng=rng,
+                seed=rng.state,
+                difficulty=difficulty,
+                improved=improved,
+                zero_enemy_radar_budgets=zero_enemy_radar_budgets,
+            )
             state.level_index = i + 1
             state.level_id = level_id_from_filename(filename)
             self.profiles.apply_campaign_profile(state, campaign_profile)
@@ -83,7 +99,13 @@ class Generator1:
 
     def generate_custom(self, options: Generator1CustomOptions) -> GeneratedLevel:
         seed = self._normalize_seed(options.seed)
-        state = _State(rng=MSVCRTRandom(seed), seed=seed, difficulty=options.difficulty, improved=options.improved)
+        state = _State(
+            rng=MSVCRTRandom(seed),
+            seed=seed,
+            difficulty=options.difficulty,
+            improved=options.improved,
+            zero_enemy_radar_budgets=options.zero_enemy_radar_budgets,
+        )
         state.emit_player_enablement = True
         self.scenario.apply_custom_options(state, options)
         return self._generate(state, "custom_level.ldf", apply_scenario=not self.scenario.has_custom_scenario(options))

@@ -46,7 +46,9 @@ Full references:
 - [Backend API](docs/api.md)
 - [Backend architecture](docs/architecture.md)
 
-For Generator2, add `--zero-enemy-station-delays` to set all enemy host station `*_delay` values to `0`.
+For both generators, add `--zero-enemy-radar-budgets` to set all enemy host station
+`rad_budget` values to `0`. For Generator2, add `--zero-enemy-station-delays` to
+set all enemy host station `*_delay` values to `0`.
 
 Launch the GUI:
 

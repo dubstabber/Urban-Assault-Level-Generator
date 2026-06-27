@@ -11,6 +11,7 @@ DEFAULT_SETTINGS_FILE = "RandomUA.ini"
 RLG_SECTION = "RLG Data"
 FILE_SECTION = "FileLocations"
 UA_SECTION = "UA Installed Folder"
+GENERATOR1_SECTION = "Generator1"
 GENERATOR2_SECTION = "Generator2"
 
 
@@ -25,6 +26,8 @@ class GuiSettings:
     generator2_single_level_file: str = ""
     generator2_campaign_directory: str = ""
     generator2_zero_enemy_station_delays: bool = False
+    generator1_zero_enemy_radar_budgets: bool = False
+    generator2_zero_enemy_radar_budgets: bool = False
 
 
 
@@ -45,10 +48,16 @@ def load_settings(path: str | Path | None = None) -> GuiSettings:
         campaign_directory=_get_option(parser, UA_SECTION, "CampaignDirectory"),
         exe_location=_get_option(parser, UA_SECTION, "EXELocation"),
         use_building_scripts=_truthy(_get_option(parser, RLG_SECTION, "Data3-DO NOT CHANGE", default="1")),
+        generator1_zero_enemy_radar_budgets=_truthy(
+            _get_option(parser, GENERATOR1_SECTION, "ZeroEnemyRadarBudgets", default="0")
+        ),
         generator2_single_level_file=_get_option(parser, GENERATOR2_SECTION, "SingleLevelFile"),
         generator2_campaign_directory=_get_option(parser, GENERATOR2_SECTION, "CampaignDirectory"),
         generator2_zero_enemy_station_delays=_truthy(
             _get_option(parser, GENERATOR2_SECTION, "ZeroEnemyStationDelays", default="0")
+        ),
+        generator2_zero_enemy_radar_budgets=_truthy(
+            _get_option(parser, GENERATOR2_SECTION, "ZeroEnemyRadarBudgets", default="0")
         ),
     )
 
@@ -69,10 +78,14 @@ def save_settings(settings: GuiSettings, path: str | Path | None = None) -> Path
         "CampaignDirectory": settings.campaign_directory,
         "EXELocation": settings.exe_location,
     }
+    parser[GENERATOR1_SECTION] = {
+        "ZeroEnemyRadarBudgets": "1" if settings.generator1_zero_enemy_radar_budgets else "0",
+    }
     parser[GENERATOR2_SECTION] = {
         "SingleLevelFile": settings.generator2_single_level_file,
         "CampaignDirectory": settings.generator2_campaign_directory,
         "ZeroEnemyStationDelays": "1" if settings.generator2_zero_enemy_station_delays else "0",
+        "ZeroEnemyRadarBudgets": "1" if settings.generator2_zero_enemy_radar_budgets else "0",
     }
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     with settings_path.open("w", encoding="utf-8", newline="") as handle:

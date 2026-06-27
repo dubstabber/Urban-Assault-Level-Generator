@@ -32,6 +32,7 @@ level = Generator1().generate_single(
     difficulty=5,
     skill=6,
     improved=True,
+    zero_enemy_radar_budgets=False,
 )
 ```
 
@@ -43,6 +44,8 @@ generate_single(
     difficulty: int = 5,
     skill: int = 0,
     improved: bool = True,
+    *,
+    zero_enemy_radar_budgets: bool = False,
 ) -> GeneratedLevel
 ```
 
@@ -52,6 +55,7 @@ generate_single(
 | `difficulty` | `5` | Difficulty used by the difficulty-based scenario when `skill` is `0`. |
 | `skill` | `0` | Scenario category selector. Nonzero values are clamped to `1` through `11`; `0` uses the difficulty-based scenario. |
 | `improved` | `True` | Keep improved tileset filtering enabled. Pass `False` for strict parity behavior. |
+| `zero_enemy_radar_budgets` | `False` | Set all enemy host station `rad_budget` values to `0`. |
 
 ### `generate_campaign`
 
@@ -61,6 +65,7 @@ campaign = Generator1().generate_campaign(
     difficulty=5,
     improved=True,
     campaign_profile="original",
+    zero_enemy_radar_budgets=False,
 )
 ```
 
@@ -72,6 +77,8 @@ generate_campaign(
     difficulty: int = 5,
     improved: bool = True,
     campaign_profile: str = "original",
+    *,
+    zero_enemy_radar_budgets: bool = False,
 ) -> GeneratedCampaign
 ```
 
@@ -81,6 +88,7 @@ generate_campaign(
 | `difficulty` | `5` | Difficulty passed into each generated level. |
 | `improved` | `True` | Keep improved tileset filtering enabled. Pass `False` for strict parity behavior. |
 | `campaign_profile` | `"original"` | Built-in choices are `"original"`, `"md-ghorkov"`, and `"md-taerkasten"`. |
+| `zero_enemy_radar_budgets` | `False` | Set all enemy host station `rad_budget` values to `0`. |
 
 Unknown campaign profiles raise `ValueError` and include the available choices.
 
@@ -94,6 +102,7 @@ options = Generator1CustomOptions(
     gate_target_level_id=70,
     gate_key_count=4,
     player_energy=600000,
+    zero_enemy_radar_budgets=True,
 )
 level = Generator1().generate_custom(options)
 ```
@@ -130,6 +139,7 @@ options. It returns a `GeneratedLevel` with filename `custom_level.ldf`.
 | `superitem_countdowns` | `{}` | Mapping for superitem indexes `1` and `2`; values are clamped to `0` or greater. |
 | `enabled_vehicles` | `{}` | Mapping of faction ID to vehicle IDs forced into the enable block. |
 | `enabled_buildings` | `{}` | Mapping of faction ID to building IDs forced into the enable block. |
+| `zero_enemy_radar_budgets` | `False` | Set all enemy host station `rad_budget` values to `0`. |
 
 Faction IDs are defined in `ualg.constants`: `1` Resistance, `2` Sulgogars,
 `3` Mykonians, `4` Taerkasten, `5` Black Sect, `6` Ghorkovs, and `7` Tutor.
@@ -147,6 +157,7 @@ level = Generator2().generate_single(
     seed=112233,
     level_id=1,
     zero_enemy_station_delays=False,
+    zero_enemy_radar_budgets=False,
 )
 ```
 
@@ -158,6 +169,7 @@ generate_single(
     level_id: int = 1,
     *,
     zero_enemy_station_delays: bool = False,
+    zero_enemy_radar_budgets: bool = False,
 ) -> GeneratedLevel
 ```
 
@@ -166,6 +178,7 @@ generate_single(
 | `seed` | `0` | Integer RNG seed. `0` uses the current time. |
 | `level_id` | `1` | Original Generator2 campaign level ID to generate. |
 | `zero_enemy_station_delays` | `False` | Set all enemy host station `*_delay` values to `0`. |
+| `zero_enemy_radar_budgets` | `False` | Set all enemy host station `rad_budget` values to `0`. |
 
 Unknown level IDs raise `ValueError`.
 
@@ -176,6 +189,7 @@ campaign = Generator2().generate_campaign(
     seed=998877,
     campaign_profile="original",
     zero_enemy_station_delays=True,
+    zero_enemy_radar_budgets=True,
 )
 ```
 
@@ -187,6 +201,7 @@ generate_campaign(
     campaign_profile: str = "original",
     *,
     zero_enemy_station_delays: bool = False,
+    zero_enemy_radar_budgets: bool = False,
 ) -> GeneratedCampaign
 ```
 
@@ -195,6 +210,7 @@ generate_campaign(
 | `seed` | `0` | Integer RNG seed. `0` uses the current time. |
 | `campaign_profile` | `"original"` | Built-in choices are `"original"`, `"md-ghorkov"`, and `"md-taerkasten"`. |
 | `zero_enemy_station_delays` | `False` | Set all enemy host station `*_delay` values to `0`. |
+| `zero_enemy_radar_budgets` | `False` | Set all enemy host station `rad_budget` values to `0`. |
 
 Unknown campaign profiles raise `ValueError` and include the available choices.
 

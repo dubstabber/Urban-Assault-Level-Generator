@@ -43,7 +43,59 @@ from .workflows import (
 
 
 APP_TITLE = "Urban Assault Level Generator"
+ENEMY_RADAR_BUDGET_TOOLTIP = (
+    "Prevents enemy AI from spending budget on radar stations. This keeps host stations from roaming away from "
+    "their bases, where nearby squads could destroy them."
+)
 WorkflowResult = TypeVar("WorkflowResult")
+
+
+class ToolTip:
+    def __init__(self, widget: tk.Widget, text: str) -> None:
+        self.widget = widget
+        self.text = text
+        self._after_id: str | None = None
+        self._window: tk.Toplevel | None = None
+        widget.bind("<Enter>", self._schedule, add="+")
+        widget.bind("<Leave>", self._hide, add="+")
+        widget.bind("<ButtonPress>", self._hide, add="+")
+
+    def _schedule(self, _event: object | None = None) -> None:
+        self._cancel()
+        self._after_id = self.widget.after(450, self._show)
+
+    def _cancel(self) -> None:
+        if self._after_id is not None:
+            self.widget.after_cancel(self._after_id)
+            self._after_id = None
+
+    def _show(self) -> None:
+        self._after_id = None
+        if self._window is not None:
+            return
+        x = self.widget.winfo_rootx() + 22
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 4
+        window = tk.Toplevel(self.widget)
+        window.wm_overrideredirect(True)
+        window.wm_geometry(f"+{x}+{y}")
+        tk.Label(
+            window,
+            text=self.text,
+            justify="left",
+            background="#ffffe0",
+            relief="solid",
+            borderwidth=1,
+            padx=6,
+            pady=4,
+            wraplength=320,
+        ).pack()
+        self._window = window
+
+    def _hide(self, _event: object | None = None) -> None:
+        self._cancel()
+        if self._window is not None:
+            self._window.destroy()
+            self._window = None
 
 
 class Generator1GUI:
@@ -59,6 +111,9 @@ class Generator1GUI:
         self.exe_var = tk.StringVar(value=settings.exe_location)
         self.campaign_dir_var = tk.StringVar(value=settings.campaign_directory)
         self.generator1_campaign_profile_var = tk.StringVar(value="original")
+        self.generator1_zero_enemy_radar_budgets_var = tk.BooleanVar(
+            value=settings.generator1_zero_enemy_radar_budgets
+        )
         self.generator2_single_file_var = tk.StringVar(value=settings.generator2_single_level_file)
         self.generator2_campaign_dir_var = tk.StringVar(value=settings.generator2_campaign_directory)
         self.generator2_level_id_var = tk.StringVar(value="1")
@@ -68,8 +123,12 @@ class Generator1GUI:
         self.generator2_zero_enemy_station_delays_var = tk.BooleanVar(
             value=settings.generator2_zero_enemy_station_delays
         )
+        self.generator2_zero_enemy_radar_budgets_var = tk.BooleanVar(
+            value=settings.generator2_zero_enemy_radar_budgets
+        )
         self.building_scripts_var = tk.BooleanVar(value=settings.use_building_scripts)
         self.status_var = tk.StringVar(value="Ready.")
+        self.tooltips: list[ToolTip] = []
 
         self.root.title(APP_TITLE)
         self.root.resizable(False, False)
@@ -125,17 +184,25 @@ class Generator1GUI:
             state="readonly",
             width=16,
         ).grid(row=0, column=1, sticky="ew")
-        tk.Button(menu, text="Create a WHOLE CAMPAIGN", command=self._make_campaign).grid(
-            row=4, column=0, columnspan=2, sticky="ew", pady=2
+        radar_check = tk.Checkbutton(
+            menu,
+            text="Disable enemy radar budgets",
+            variable=self.generator1_zero_enemy_radar_budgets_var,
+            anchor="w",
         )
-        tk.Button(menu, text="Credits", command=self._show_credits).grid(row=5, column=0, sticky="ew", padx=(0, 2), pady=2)
+        radar_check.grid(row=4, column=0, columnspan=2, sticky="ew", pady=2)
+        self._add_tooltip(radar_check, ENEMY_RADAR_BUDGET_TOOLTIP)
+        tk.Button(menu, text="Create a WHOLE CAMPAIGN", command=self._make_campaign).grid(
+            row=5, column=0, columnspan=2, sticky="ew", pady=2
+        )
+        tk.Button(menu, text="Credits", command=self._show_credits).grid(row=6, column=0, sticky="ew", padx=(0, 2), pady=2)
         tk.Button(menu, text="Read The License Agreement", command=self._show_license).grid(
-            row=5, column=1, sticky="ew", padx=(2, 0), pady=2
+            row=6, column=1, sticky="ew", padx=(2, 0), pady=2
         )
         tk.Button(menu, text="Create Backup", command=self._create_backup).grid(
-            row=6, column=0, sticky="ew", padx=(0, 2), pady=2
+            row=7, column=0, sticky="ew", padx=(0, 2), pady=2
         )
-        tk.Button(menu, text="Exit", command=self._exit).grid(row=6, column=1, sticky="ew", padx=(2, 0), pady=2)
+        tk.Button(menu, text="Exit", command=self._exit).grid(row=7, column=1, sticky="ew", padx=(2, 0), pady=2)
 
         notice = (
             "YOU ARE BOUND TO THE TERMS AND CONDITIONS IN THE LICENSE AGREEMENT IF YOU USE\n"
@@ -191,6 +258,13 @@ class Generator1GUI:
             text="Set enemy host station delays to 0",
             variable=self.generator2_zero_enemy_station_delays_var,
         ).grid(row=0, column=0, sticky="w")
+        radar_check = tk.Checkbutton(
+            options,
+            text="Disable enemy radar budgets",
+            variable=self.generator2_zero_enemy_radar_budgets_var,
+        )
+        radar_check.grid(row=1, column=0, sticky="w")
+        self._add_tooltip(radar_check, ENEMY_RADAR_BUDGET_TOOLTIP)
 
         single = tk.LabelFrame(outer, text="Single Level", padx=8, pady=8)
         single.grid(row=1, column=0, sticky="ew", pady=(8, 0))
@@ -303,11 +377,21 @@ class Generator1GUI:
             row=base_row + 1, column=1, sticky="e", padx=(6, 0), pady=(0, 2)
         )
 
+    def _add_tooltip(self, widget: tk.Widget, text: str) -> None:
+        self.tooltips.append(ToolTip(widget, text))
+
     def _make_random_single(self) -> None:
         target = self._ensure_file_path(self.random_file_var, "Select single level output file")
         if target is None:
             return
-        self._generate_single(target, seed=0, difficulty=5, skill=0, improved=True)
+        self._generate_single(
+            target,
+            seed=0,
+            difficulty=5,
+            skill=0,
+            improved=True,
+            zero_enemy_radar_budgets=self.generator1_zero_enemy_radar_budgets_var.get(),
+        )
 
     def _make_skill_single(self) -> None:
         if LEGACY_SKILL_DIALOG in self.legacy_dialogs:
@@ -336,7 +420,14 @@ class Generator1GUI:
         target = self._ensure_file_path(self.random_file_var, "Select single level output file")
         if target is None:
             return
-        self._generate_single(target, seed=0, difficulty=5, skill=skill, improved=True)
+        self._generate_single(
+            target,
+            seed=0,
+            difficulty=5,
+            skill=skill,
+            improved=True,
+            zero_enemy_radar_budgets=self.generator1_zero_enemy_radar_budgets_var.get(),
+        )
 
     def _make_seed_single(self) -> None:
         if LEGACY_SEED_DIALOG in self.legacy_dialogs:
@@ -355,7 +446,14 @@ class Generator1GUI:
         target = self._ensure_file_path(self.random_file_var, "Select single level output file")
         if target is None:
             return
-        self._generate_single(target, seed=seed, difficulty=5, skill=0, improved=True)
+        self._generate_single(
+            target,
+            seed=seed,
+            difficulty=5,
+            skill=0,
+            improved=True,
+            zero_enemy_radar_budgets=self.generator1_zero_enemy_radar_budgets_var.get(),
+        )
 
     def _make_custom_single(self) -> None:
         options = CustomWizardDialog(
@@ -364,6 +462,7 @@ class Generator1GUI:
         ).run()
         if options is None:
             return
+        options.zero_enemy_radar_budgets = self.generator1_zero_enemy_radar_budgets_var.get()
         target = self._ensure_file_path(self.custom_file_var, "Select custom level output file")
         if target is None:
             return
@@ -381,7 +480,12 @@ class Generator1GUI:
             if not dialog.run():
                 return
         campaign_profile = self.generator1_campaign_profile_var.get().strip() or "original"
-        self._generate_campaign(directory, seed=seed, campaign_profile=campaign_profile)
+        self._generate_campaign(
+            directory,
+            seed=seed,
+            campaign_profile=campaign_profile,
+            zero_enemy_radar_budgets=self.generator1_zero_enemy_radar_budgets_var.get(),
+        )
 
     def _make_generator2_single(self) -> None:
         level_id = self._generator2_level_id()
@@ -402,6 +506,7 @@ class Generator1GUI:
             seed=seed,
             level_id=level_id,
             zero_enemy_station_delays=self.generator2_zero_enemy_station_delays_var.get(),
+            zero_enemy_radar_budgets=self.generator2_zero_enemy_radar_budgets_var.get(),
         )
 
     def _make_generator2_campaign(self) -> None:
@@ -417,9 +522,18 @@ class Generator1GUI:
             seed=seed,
             campaign_profile=campaign_profile,
             zero_enemy_station_delays=self.generator2_zero_enemy_station_delays_var.get(),
+            zero_enemy_radar_budgets=self.generator2_zero_enemy_radar_budgets_var.get(),
         )
 
-    def _generate_single(self, target: Path, seed: int, difficulty: int, skill: int, improved: bool) -> None:
+    def _generate_single(
+        self,
+        target: Path,
+        seed: int,
+        difficulty: int,
+        skill: int,
+        improved: bool,
+        zero_enemy_radar_budgets: bool,
+    ) -> None:
         self._run_generation_workflow(
             start_status="Generating level...",
             failure_status="Generation failed.",
@@ -431,6 +545,7 @@ class Generator1GUI:
                 difficulty=difficulty,
                 skill=skill,
                 improved=improved,
+                zero_enemy_radar_budgets=zero_enemy_radar_budgets,
             ),
             success_status=lambda result: f"Wrote {result.written}",
             success_lines=self._level_created_lines,
@@ -447,13 +562,24 @@ class Generator1GUI:
             success_lines=self._level_created_lines,
         )
 
-    def _generate_campaign(self, directory: Path, seed: int, campaign_profile: str) -> None:
+    def _generate_campaign(
+        self,
+        directory: Path,
+        seed: int,
+        campaign_profile: str,
+        zero_enemy_radar_budgets: bool,
+    ) -> None:
         self._run_generation_workflow(
             start_status="Generating campaign...",
             failure_status="Campaign generation failed.",
             error_title="Campaign Generation Failed",
             success_title="Campaign Created",
-            action=lambda: generate_generator1_campaign(directory, seed=seed, campaign_profile=campaign_profile),
+            action=lambda: generate_generator1_campaign(
+                directory,
+                seed=seed,
+                campaign_profile=campaign_profile,
+                zero_enemy_radar_budgets=zero_enemy_radar_budgets,
+            ),
             success_status=lambda result: f"Wrote {len(result.written)} campaign levels.",
             success_lines=lambda result: self._campaign_created_lines(result, "Generator1"),
         )
@@ -464,6 +590,7 @@ class Generator1GUI:
         seed: int,
         level_id: int,
         zero_enemy_station_delays: bool,
+        zero_enemy_radar_budgets: bool,
     ) -> None:
         self._run_generation_workflow(
             start_status="Generating Generator2 level...",
@@ -475,6 +602,7 @@ class Generator1GUI:
                 seed=seed,
                 level_id=level_id,
                 zero_enemy_station_delays=zero_enemy_station_delays,
+                zero_enemy_radar_budgets=zero_enemy_radar_budgets,
             ),
             success_status=lambda result: f"Wrote {result.written}",
             success_lines=self._generator2_level_created_lines,
@@ -486,6 +614,7 @@ class Generator1GUI:
         seed: int,
         campaign_profile: str,
         zero_enemy_station_delays: bool,
+        zero_enemy_radar_budgets: bool,
     ) -> None:
         self._run_generation_workflow(
             start_status="Generating Generator2 campaign...",
@@ -497,6 +626,7 @@ class Generator1GUI:
                 seed=seed,
                 campaign_profile=campaign_profile,
                 zero_enemy_station_delays=zero_enemy_station_delays,
+                zero_enemy_radar_budgets=zero_enemy_radar_budgets,
             ),
             success_status=lambda result: f"Wrote {len(result.written)} Generator2 campaign levels.",
             success_lines=lambda result: self._campaign_created_lines(result, "Generator2"),
@@ -717,9 +847,11 @@ class Generator1GUI:
             campaign_directory=self.campaign_dir_var.get().strip(),
             exe_location=self.exe_var.get().strip(),
             use_building_scripts=self.building_scripts_var.get(),
+            generator1_zero_enemy_radar_budgets=self.generator1_zero_enemy_radar_budgets_var.get(),
             generator2_single_level_file=self.generator2_single_file_var.get().strip(),
             generator2_campaign_directory=self.generator2_campaign_dir_var.get().strip(),
             generator2_zero_enemy_station_delays=self.generator2_zero_enemy_station_delays_var.get(),
+            generator2_zero_enemy_radar_budgets=self.generator2_zero_enemy_radar_budgets_var.get(),
         )
 
     def _show_credits(self) -> None:

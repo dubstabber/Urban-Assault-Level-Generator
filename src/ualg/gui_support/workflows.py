@@ -41,10 +41,17 @@ def generate_generator1_single(
     difficulty: int,
     skill: int,
     improved: bool,
+    zero_enemy_radar_budgets: bool = False,
 ) -> LevelGenerationResult:
     target_path = Path(target)
     backup_path = backup_existing_file(target_path)
-    level = Generator1().generate_single(seed=seed, difficulty=difficulty, skill=skill, improved=improved)
+    level = Generator1().generate_single(
+        seed=seed,
+        difficulty=difficulty,
+        skill=skill,
+        improved=improved,
+        zero_enemy_radar_budgets=zero_enemy_radar_budgets,
+    )
     written = level.write(target_path)
     return LevelGenerationResult(level=level, written=written, backup_path=backup_path)
 
@@ -62,6 +69,7 @@ def generate_generator1_campaign(
     *,
     seed: int,
     campaign_profile: str,
+    zero_enemy_radar_budgets: bool = False,
 ) -> CampaignGenerationResult:
     target_dir = Path(directory)
     backup_dir, moved = backup_campaign_ldfs(target_dir)
@@ -70,6 +78,7 @@ def generate_generator1_campaign(
         difficulty=5,
         improved=True,
         campaign_profile=campaign_profile,
+        zero_enemy_radar_budgets=zero_enemy_radar_budgets,
     )
     written = campaign.write(target_dir)
     return CampaignGenerationResult(
@@ -88,6 +97,7 @@ def generate_generator2_single(
     seed: int,
     level_id: int,
     zero_enemy_station_delays: bool = False,
+    zero_enemy_radar_budgets: bool = False,
 ) -> LevelGenerationResult:
     target_path = Path(target)
     backup_path = backup_existing_file(target_path)
@@ -95,6 +105,7 @@ def generate_generator2_single(
         seed=seed,
         level_id=level_id,
         zero_enemy_station_delays=zero_enemy_station_delays,
+        zero_enemy_radar_budgets=zero_enemy_radar_budgets,
     )
     written = level.write(target_path)
     return LevelGenerationResult(level=level, written=written, backup_path=backup_path)
@@ -106,6 +117,7 @@ def generate_generator2_campaign(
     seed: int,
     campaign_profile: str,
     zero_enemy_station_delays: bool = False,
+    zero_enemy_radar_budgets: bool = False,
 ) -> CampaignGenerationResult:
     target_dir = Path(directory)
     backup_dir, moved = backup_campaign_ldfs(target_dir)
@@ -113,6 +125,7 @@ def generate_generator2_campaign(
         seed=seed,
         campaign_profile=campaign_profile,
         zero_enemy_station_delays=zero_enemy_station_delays,
+        zero_enemy_radar_budgets=zero_enemy_radar_budgets,
     )
     written = campaign.write(target_dir)
     return CampaignGenerationResult(

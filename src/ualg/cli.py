@@ -21,6 +21,11 @@ def build_parser() -> argparse.ArgumentParser:
     gen1_single.add_argument("--difficulty", type=int, default=5)
     gen1_single.add_argument("--skill", type=int, default=0)
     gen1_single.add_argument("--strict-parity", action="store_true", help="Disable improved tileset filtering")
+    gen1_single.add_argument(
+        "--zero-enemy-radar-budgets",
+        action="store_true",
+        help="Set all enemy host station rad_budget values to 0",
+    )
     gen1_single.add_argument("--output", required=True)
     gen1_campaign = gen1_sub.add_parser("campaign", help="Generate the 44-level Generator1 campaign")
     gen1_campaign.add_argument("--seed", type=int, default=0)
@@ -31,6 +36,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=GENERATOR1_CAMPAIGN_PROFILES,
         default="original",
         help="Generator1 campaign roster/profile to generate",
+    )
+    gen1_campaign.add_argument(
+        "--zero-enemy-radar-budgets",
+        action="store_true",
+        help="Set all enemy host station rad_budget values to 0",
     )
     gen1_campaign.add_argument("--output-dir", required=True)
 
@@ -43,6 +53,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--zero-enemy-station-delays",
         action="store_true",
         help="Set all enemy host station *_delay values to 0",
+    )
+    gen2_single.add_argument(
+        "--zero-enemy-radar-budgets",
+        action="store_true",
+        help="Set all enemy host station rad_budget values to 0",
     )
     gen2_single.add_argument("--output", required=True)
     gen2_campaign = gen2_sub.add_parser("campaign", help="Generate the 42-level Generator2 campaign")
@@ -57,6 +72,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--zero-enemy-station-delays",
         action="store_true",
         help="Set all enemy host station *_delay values to 0",
+    )
+    gen2_campaign.add_argument(
+        "--zero-enemy-radar-budgets",
+        action="store_true",
+        help="Set all enemy host station rad_budget values to 0",
     )
     gen2_campaign.add_argument("--output-dir", required=True)
 
@@ -74,6 +94,7 @@ def main(argv: list[str] | None = None) -> int:
                 difficulty=args.difficulty,
                 skill=args.skill,
                 improved=improved,
+                zero_enemy_radar_budgets=args.zero_enemy_radar_budgets,
             )
             path = level.write(args.output)
             print(f"Wrote {path}")
@@ -83,6 +104,7 @@ def main(argv: list[str] | None = None) -> int:
             difficulty=args.difficulty,
             improved=improved,
             campaign_profile=args.campaign_profile,
+            zero_enemy_radar_budgets=args.zero_enemy_radar_budgets,
         )
         written = campaign.write(args.output_dir)
         print(f"Wrote {len(written)} Generator1 levels to {Path(args.output_dir)}")
@@ -94,6 +116,7 @@ def main(argv: list[str] | None = None) -> int:
             seed=args.seed,
             level_id=args.level_id,
             zero_enemy_station_delays=args.zero_enemy_station_delays,
+            zero_enemy_radar_budgets=args.zero_enemy_radar_budgets,
         )
         path = level.write(args.output)
         print(f"Wrote {path}")
@@ -102,6 +125,7 @@ def main(argv: list[str] | None = None) -> int:
         seed=args.seed,
         campaign_profile=args.campaign_profile,
         zero_enemy_station_delays=args.zero_enemy_station_delays,
+        zero_enemy_radar_budgets=args.zero_enemy_radar_budgets,
     )
     written = campaign.write(args.output_dir)
     print(f"Wrote {len(written)} Generator2 levels to {Path(args.output_dir)}")

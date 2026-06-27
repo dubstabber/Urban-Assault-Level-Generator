@@ -49,3 +49,4 @@ class _Level:
     excluded: list[dict[str, Any]] = field(default_factory=list)
     hosts: dict[str, list[dict[str, int]]] = field(default_factory=dict)
     maps: dict[str, MapRows] = field(default_factory=dict)
+    zero_enemy_radar_budgets: bool = False

@@ -70,9 +70,11 @@ class GuiHelperTests(unittest.TestCase):
             campaign_directory=str(self.tmp_path / "campaign"),
             exe_location=str(self.tmp_path / "UA.exe"),
             use_building_scripts=False,
+            generator1_zero_enemy_radar_budgets=True,
             generator2_single_level_file=str(self.tmp_path / "gen2_single.ldf"),
             generator2_campaign_directory=str(self.tmp_path / "gen2_campaign"),
             generator2_zero_enemy_station_delays=True,
+            generator2_zero_enemy_radar_budgets=True,
         )
 
         saved = save_settings(settings, path)
@@ -105,19 +107,24 @@ class GuiHelperTests(unittest.TestCase):
         self.assertEqual(loaded.campaign_directory, "C:/ua/campaign")
         self.assertEqual(loaded.exe_location, "C:/ua/UA.exe")
         self.assertFalse(loaded.use_building_scripts)
+        self.assertFalse(loaded.generator1_zero_enemy_radar_budgets)
         self.assertEqual(loaded.generator2_single_level_file, "")
         self.assertEqual(loaded.generator2_campaign_directory, "")
         self.assertFalse(loaded.generator2_zero_enemy_station_delays)
+        self.assertFalse(loaded.generator2_zero_enemy_radar_budgets)
 
     def test_load_settings_reads_generator2_paths(self) -> None:
         path = self.tmp_path / "RandomUA.ini"
         path.write_text(
             "\n".join(
                 [
+                    "[Generator1]",
+                    "ZeroEnemyRadarBudgets=1",
                     "[Generator2]",
                     "SingleLevelFile=C:/levels/L0101.ldf",
                     "CampaignDirectory=C:/levels/gen2",
                     "ZeroEnemyStationDelays=1",
+                    "ZeroEnemyRadarBudgets=1",
                 ]
             ),
             encoding="utf-8",
@@ -125,9 +132,11 @@ class GuiHelperTests(unittest.TestCase):
 
         loaded = load_settings(path)
 
+        self.assertTrue(loaded.generator1_zero_enemy_radar_budgets)
         self.assertEqual(loaded.generator2_single_level_file, "C:/levels/L0101.ldf")
         self.assertEqual(loaded.generator2_campaign_directory, "C:/levels/gen2")
         self.assertTrue(loaded.generator2_zero_enemy_station_delays)
+        self.assertTrue(loaded.generator2_zero_enemy_radar_budgets)
 
     def test_backup_existing_file_copies_without_removing_source(self) -> None:
         source = self.tmp_path / "level.ldf"
@@ -176,7 +185,14 @@ class GuiHelperTests(unittest.TestCase):
         target = self.tmp_path / "single.ldf"
         target.write_text("old level", encoding="utf-8")
 
-        result = generate_generator1_single(target, seed=424242, difficulty=5, skill=6, improved=True)
+        result = generate_generator1_single(
+            target,
+            seed=424242,
+            difficulty=5,
+            skill=6,
+            improved=True,
+            zero_enemy_radar_budgets=True,
+        )
 
         self.assertEqual(result.written, target)
         self.assertEqual(result.level.seed, 424242)
@@ -186,6 +202,9 @@ class GuiHelperTests(unittest.TestCase):
         assert result.backup_path is not None
         self.assertTrue(result.backup_path.exists())
         self.assertEqual(result.backup_path.read_text(encoding="utf-8"), "old level")
+        radar_values = self._radar_budget_values(result.level.text)
+        self.assertTrue(radar_values)
+        self.assertEqual(set(radar_values), {"0"})
 
     def test_generator2_campaign_workflow_writes_campaign_and_reports_backup(self) -> None:
         directory = self.tmp_path / "campaign"
@@ -198,6 +217,7 @@ class GuiHelperTests(unittest.TestCase):
             seed=998877,
             campaign_profile="original",
             zero_enemy_station_delays=True,
+            zero_enemy_radar_budgets=True,
         )
 
         self.assertEqual(result.directory, directory)
@@ -217,6 +237,13 @@ class GuiHelperTests(unittest.TestCase):
         ]
         self.assertTrue(delay_values)
         self.assertEqual(set(delay_values), {"0"})
+        radar_values = [
+            value
+            for level in result.campaign.levels
+            for value in self._radar_budget_values(level.text)
+        ]
+        self.assertTrue(radar_values)
+        self.assertEqual(set(radar_values), {"0"})
 
     def test_configured_backup_workflow_skips_blanks_and_deduplicates_paths(self) -> None:
         single = self.tmp_path / "single.ldf"
@@ -266,6 +293,17 @@ class GuiHelperTests(unittest.TestCase):
                 continue
             key, value = (part.strip() for part in line.split("=", 1))
             if key in GENERATOR2_ENEMY_STATION_DELAY_KEYS:
+                values.append(value)
+        return values
+
+    @staticmethod
+    def _radar_budget_values(text: str) -> list[str]:
+        values: list[str] = []
+        for line in text.splitlines():
+            if "=" not in line:
+                continue
+            key, value = (part.strip() for part in line.split("=", 1))
+            if key == "rad_budget":
                 values.append(value)
         return values
 

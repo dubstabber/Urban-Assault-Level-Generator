@@ -39,6 +39,7 @@ class Generator1CustomOptions:
     superitem_countdowns: dict[int, int] = field(default_factory=dict)
     enabled_vehicles: dict[int, list[int]] = field(default_factory=dict)
     enabled_buildings: dict[int, list[int]] = field(default_factory=dict)
+    zero_enemy_radar_budgets: bool = False
 
 
 @dataclass
@@ -101,6 +102,7 @@ class _State:
     forced_enabled_buildings: dict[int, list[int]] = field(default_factory=dict)
     reserved_sectors: set[tuple[int, int]] = field(default_factory=set)
     last_superitem_key_count: int = 0
+    zero_enemy_radar_budgets: bool = False
 
     @property
     def width_interior(self) -> int:
