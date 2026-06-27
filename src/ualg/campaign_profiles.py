@@ -23,6 +23,9 @@ _FACTION_TAERKASTEN = 4
 _FACTION_BLACK_SECT = 5
 _FACTION_GHORKOVS = 6
 _FACTION_TUTOR = 7
+_ROCK_SLED_VEHICLE_ID = 11
+_METROPOLIS_DAWN_PROFILE_IDS = {"md-ghorkov", "md-taerkasten"}
+_GENERATOR2_ROCK_SLED_EXCLUDED_FACTIONS = {"bla", _FACTION_BLACK_SECT}
 
 GENERATOR2_FACTION_IDS = {"res": 1, "sul": 2, "myk": 3, "tae": 4, "bla": 5, "gho": 6}
 GENERATOR2_FACTION_CODES_BY_ID = {faction_id: code for code, faction_id in GENERATOR2_FACTION_IDS.items()}
@@ -133,10 +136,11 @@ def _build_profile(generator: str, profile_id: str, spec: dict[str, Any]) -> Cam
     data_profile = str(spec.get("data_profile", UA_ORIGINAL_PROFILE))
     roster_profile = str(spec.get("roster_profile", data_profile))
     roster = _build_generator1_roster(roster_profile) if generator == "generator1" else _build_generator2_roster(spec, roster_profile)
-    targets_by_level = _targets_by_level(spec, level_ids)
     player_faction = spec.get("player_faction")
     if player_faction is None:
         raise ValueError(f"Profile {generator}/{profile_id} must define player_faction.")
+    roster = _apply_roster_exceptions(generator, profile_id, roster, player_faction)
+    targets_by_level = _targets_by_level(spec, level_ids)
     player_vehicle = int(spec.get("player_vehicle", 0))
     player_robo_by_level = {int(level_id): int(vehicle) for level_id, vehicle in spec.get("player_robo_by_level", {}).items()}
     enemy_factions = _enemy_factions(generator, spec, player_faction)
@@ -203,6 +207,39 @@ def _build_generator2_roster(spec: dict[str, Any], profile: str) -> ProfileRoste
         buildings_by_faction=_tuple_values(buildings),
         host_vehicle_by_faction=host_vehicles,
         player_robo_ids_by_faction=_tuple_values(player_robos),
+    )
+
+
+def _apply_roster_exceptions(
+    generator: str,
+    profile_id: str,
+    roster: ProfileRoster,
+    player_faction: Any,
+) -> ProfileRoster:
+    if generator != "generator2":
+        return roster
+
+    excluded = set(_GENERATOR2_ROCK_SLED_EXCLUDED_FACTIONS)
+    if profile_id in _METROPOLIS_DAWN_PROFILE_IDS and str(player_faction) != "res":
+        excluded.add("res")
+        excluded.add(_FACTION_PLAYER)
+    if not excluded:
+        return roster
+
+    if str(player_faction) == "res":
+        excluded.discard("res")
+        excluded.discard(_FACTION_PLAYER)
+
+    vehicles = {
+        faction: tuple(vehicle for vehicle in faction_vehicles if vehicle != _ROCK_SLED_VEHICLE_ID)
+        if faction in excluded else faction_vehicles
+        for faction, faction_vehicles in roster.vehicles_by_faction.items()
+    }
+    return ProfileRoster(
+        vehicles_by_faction=vehicles,
+        buildings_by_faction=roster.buildings_by_faction,
+        host_vehicle_by_faction=roster.host_vehicle_by_faction,
+        player_robo_ids_by_faction=roster.player_robo_ids_by_faction,
     )
 
 

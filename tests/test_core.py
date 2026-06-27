@@ -110,6 +110,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("win_movie", idx43)
         self.assertIn("lose_movie", idx43)
         self.assertNotIn("begin_enable\t1", "\n".join(level.text for level in campaign.levels))
+        self._assert_black_sect_rock_sled_not_enabled(campaign.levels)
 
     def test_generator1_rosters_follow_uadata_original(self) -> None:
         units = ua_faction_units(UA_ORIGINAL_PROFILE)
@@ -164,6 +165,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn((6, 177), turantul_ii)
         self.assertEqual(sum(1 for owner, _vehicle in turantul_i if owner == 6), 1)
         self.assertIn((1, 56), turantul_i)
+        self._assert_resistance_ai_rock_sled_not_enabled(campaign.levels)
 
     def test_generator1_metropolis_dawn_taerkasten_campaign_profile(self) -> None:
         campaign = Generator1().generate_campaign(seed=1234, campaign_profile="md-taerkasten")
@@ -183,6 +185,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn((4, 178), owner_vehicles)
         self.assertEqual(sum(1 for owner, _vehicle in owner_vehicles if owner == 4), 1)
         self.assertIn((1, 56), self._robo_owner_vehicles(by_id[45].text))
+        self._assert_resistance_ai_rock_sled_not_enabled(campaign.levels)
 
     def test_generator1_typ_map_policy(self) -> None:
         improved = Generator1().generate_single(seed=424242, difficulty=5, skill=6)
@@ -476,6 +479,8 @@ class CoreTests(unittest.TestCase):
         self.assertIn("= 44", by_id[34].text)
         self.assertNotIn("target_level", by_id[15].text)
         self.assertIn("= 15", by_id[75].text)
+        self._assert_black_sect_rock_sled_not_enabled(campaign.levels)
+        self._assert_black_sect_rock_sled_not_used_by_squads(campaign.levels)
 
     def test_generator2_metropolis_dawn_ghorkov_campaign_profile(self) -> None:
         campaign = Generator2().generate_campaign(seed=998877, campaign_profile="md-ghorkov")
@@ -492,6 +497,10 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(self._robo_owner_vehicles(by_id[37].text)[0], (6, 177))
         for level in campaign.levels:
             self.assertTrue(all(owner != 6 for owner, _vehicle in self._robo_owner_vehicles(level.text)[1:]))
+        self._assert_resistance_ai_rock_sled_not_enabled(campaign.levels)
+        self._assert_resistance_ai_rock_sled_not_used_by_squads(campaign.levels)
+        self._assert_black_sect_rock_sled_not_enabled(campaign.levels)
+        self._assert_black_sect_rock_sled_not_used_by_squads(campaign.levels)
 
     def test_generator2_metropolis_dawn_taerkasten_campaign_profile(self) -> None:
         campaign = Generator2().generate_campaign(seed=998877, campaign_profile="md-taerkasten")
@@ -508,6 +517,10 @@ class CoreTests(unittest.TestCase):
             owner_vehicles = self._robo_owner_vehicles(level.text)
             self.assertEqual(owner_vehicles[0], (4, 178))
             self.assertTrue(all(owner != 4 for owner, _vehicle in owner_vehicles[1:]))
+        self._assert_resistance_ai_rock_sled_not_enabled(campaign.levels)
+        self._assert_resistance_ai_rock_sled_not_used_by_squads(campaign.levels)
+        self._assert_black_sect_rock_sled_not_enabled(campaign.levels)
+        self._assert_black_sect_rock_sled_not_used_by_squads(campaign.levels)
 
     def test_generator2_typ_map_uses_legacy_set_list(self) -> None:
         for values in GENERATOR2_SET_LIST.values():
@@ -812,6 +825,67 @@ class CoreTests(unittest.TestCase):
             if key == name:
                 values.append(value)
         return values
+
+    def _assert_resistance_ai_rock_sled_not_enabled(self, levels) -> None:
+        self._assert_ai_rock_sled_not_enabled(levels, FACTION_PLAYER, "Resistance")
+
+    def _assert_black_sect_rock_sled_not_enabled(self, levels) -> None:
+        self._assert_ai_rock_sled_not_enabled(levels, FACTION_BLACK_SECT, "Black Sect")
+
+    def _assert_ai_rock_sled_not_enabled(self, levels, owner: int, faction_name: str) -> None:
+        found_enable = False
+        for level in levels:
+            vehicles = self._enable_vehicle_values(level.text, owner)
+            if not vehicles:
+                continue
+            found_enable = True
+            self.assertNotIn(11, vehicles, f"Rock Sled enabled for {faction_name} AI in level {level.level_id}")
+        self.assertTrue(found_enable)
+
+    def _assert_resistance_ai_rock_sled_not_used_by_squads(self, levels) -> None:
+        self._assert_ai_rock_sled_not_used_by_squads(levels, FACTION_PLAYER, "Resistance")
+
+    def _assert_black_sect_rock_sled_not_used_by_squads(self, levels) -> None:
+        self._assert_ai_rock_sled_not_used_by_squads(levels, FACTION_BLACK_SECT, "Black Sect")
+
+    def _assert_ai_rock_sled_not_used_by_squads(self, levels, owner: int, faction_name: str) -> None:
+        found_squad = False
+        for level in levels:
+            vehicles = self._block_vehicle_values(level.text, "begin_squad", owner)
+            if not vehicles:
+                continue
+            found_squad = True
+            self.assertNotIn(11, vehicles, f"Rock Sled used by {faction_name} AI squad in level {level.level_id}")
+        self.assertTrue(found_squad)
+
+    @staticmethod
+    def _enable_vehicle_values(text: str, owner: int) -> list[int]:
+        values: list[int] = []
+        in_owner_block = False
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("begin_enable"):
+                parts = stripped.split()
+                in_owner_block = len(parts) > 1 and int(parts[1]) == owner
+                continue
+            if in_owner_block and stripped == "end":
+                in_owner_block = False
+                continue
+            if not in_owner_block or "=" not in line:
+                continue
+            key, value = (part.strip() for part in line.split("=", 1))
+            if key == "vehicle":
+                values.append(int(value))
+        return values
+
+    def _block_vehicle_values(self, text: str, block_name: str, owner: int) -> list[int]:
+        vehicles: list[int] = []
+        for block in self._blocks(text, block_name):
+            owners = self._property_values(block, "owner")
+            values = self._property_values(block, "vehicle")
+            if owners and values and int(owners[0]) == owner:
+                vehicles.append(int(values[0]))
+        return vehicles
 
     def _robo_owner_vehicles(self, text: str) -> list[tuple[int, int]]:
         result: list[tuple[int, int]] = []

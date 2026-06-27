@@ -13,6 +13,7 @@ from .tables import (
 from ..constants import (
     BUILDINGS_PLAYER_IDS,
     BUILDINGS_PLAYER_PROBABILITIES,
+    FACTION_BLACK_SECT,
     FACTION_PLAYER,
     FACTION_SULGOGARS,
     FACTION_TUTOR,
@@ -24,6 +25,11 @@ from ..constants import (
     sector_to_world_z,
 )
 from ..ldf import LDFWriter
+
+
+_ROCK_SLED_VEHICLE_ID = 11
+_METROPOLIS_DAWN_PROFILE_IDS = {"md-ghorkov", "md-taerkasten"}
+_ROCK_SLED_EXCLUDED_CAMPAIGN_FACTIONS = {FACTION_BLACK_SECT}
 
 
 class Generator1Renderer:
@@ -260,7 +266,20 @@ class Generator1Renderer:
             enabled.append(74)
             return enabled
         candidates = state.vehicles_by_faction.get(faction, [])
-        return [vehicle for vehicle in candidates if state.rng.rand_mod(3) == 0] or candidates[:1]
+        enabled = [vehicle for vehicle in candidates if state.rng.rand_mod(3) == 0] or candidates[:1]
+        return self._filter_enemy_enabled_vehicles(state, faction, enabled)
+
+    @staticmethod
+    def _filter_enemy_enabled_vehicles(state: _State, faction: int, enabled: list[int]) -> list[int]:
+        excluded_factions = set(_ROCK_SLED_EXCLUDED_CAMPAIGN_FACTIONS)
+        if state.campaign_profile in _METROPOLIS_DAWN_PROFILE_IDS:
+            excluded_factions.add(FACTION_PLAYER)
+        if not state.generator1_campaign_mode or faction == state.player_faction or faction not in excluded_factions:
+            return enabled
+        filtered = [vehicle for vehicle in enabled if vehicle != _ROCK_SLED_VEHICLE_ID]
+        if filtered or not enabled:
+            return filtered
+        return [vehicle for vehicle in state.vehicles_by_faction.get(faction, []) if vehicle != _ROCK_SLED_VEHICLE_ID][:1]
 
     def _enabled_buildings(self, state: _State, faction: int) -> list[int]:
         if faction in state.forced_enabled_buildings:
