@@ -11,6 +11,7 @@ from .tables import (
     TECH_UPGRADE_BUILDING_TYP_BY_ID,
 )
 from ..constants import (
+    BLACK_SECT_ENABLE_EXCLUDED_BUILDING_IDS,
     BUILDINGS_PLAYER_IDS,
     BUILDINGS_PLAYER_PROBABILITIES,
     FACTION_BLACK_SECT,
@@ -235,7 +236,7 @@ class Generator1Renderer:
 
     def _write_enable_block(self, writer: LDFWriter, state: _State, faction: int) -> None:
         vehicles = self._filter_profile_enabled_vehicles(state, faction, self._enabled_vehicles(state, faction))
-        buildings = self._enabled_buildings(state, faction)
+        buildings = self._filter_enabled_buildings(faction, self._enabled_buildings(state, faction))
         if not vehicles and not buildings:
             return
         writer.line(f"begin_enable\t{faction}" if faction == state.player_faction else f"begin_enable {faction}")
@@ -317,6 +318,12 @@ class Generator1Renderer:
             return []
         candidates = state.buildings_by_faction.get(faction, [])
         return [building for building in candidates if state.rng.rand_mod(3) == 0] or candidates[:1]
+
+    @staticmethod
+    def _filter_enabled_buildings(faction: int, enabled: list[int]) -> list[int]:
+        if faction == FACTION_BLACK_SECT:
+            return [building for building in enabled if building not in BLACK_SECT_ENABLE_EXCLUDED_BUILDING_IDS]
+        return enabled
 
     @staticmethod
     def _record_vehicle_flags(state: _State, vehicles: list[int]) -> None:

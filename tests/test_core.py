@@ -12,6 +12,7 @@ SRC = ROOT / "src"
 sys.path.insert(0, str(SRC))
 
 from ualg.constants import (
+    BLACK_SECT_ENABLE_EXCLUDED_BUILDING_IDS,
     BLG_PLAYER_BASE,
     BLG_SUPERITEM,
     BUILDING_TYP_BY_ID,
@@ -122,6 +123,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("lose_movie", idx43)
         self.assertNotIn("begin_enable\t1", "\n".join(level.text for level in campaign.levels))
         self._assert_black_sect_campaign_blocked_vehicles_not_enabled(campaign.levels)
+        self._assert_black_sect_campaign_blocked_buildings_not_enabled(campaign.levels)
         self._assert_tech_vehicle_ids_not_used(campaign.levels, CAMPAIGN_ENABLE_EXCLUDED_VEHICLE_IDS)
 
     def test_generator1_rosters_follow_uadata_original(self) -> None:
@@ -179,6 +181,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(sum(1 for owner, _vehicle in turantul_i if owner == 6), 1)
         self.assertIn((1, 56), turantul_i)
         self._assert_resistance_campaign_blocked_vehicles_not_enabled(campaign.levels)
+        self._assert_black_sect_campaign_blocked_buildings_not_enabled(campaign.levels)
 
     def test_generator1_metropolis_dawn_taerkasten_campaign_profile(self) -> None:
         campaign = Generator1().generate_campaign(seed=1234, campaign_profile="md-taerkasten")
@@ -200,6 +203,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(sum(1 for owner, _vehicle in owner_vehicles if owner == 4), 1)
         self.assertIn((1, 56), self._robo_owner_vehicles(by_id[45].text))
         self._assert_resistance_campaign_blocked_vehicles_not_enabled(campaign.levels)
+        self._assert_black_sect_campaign_blocked_buildings_not_enabled(campaign.levels)
         self._assert_vehicle_ids_not_enabled(
             campaign.levels,
             FACTION_TAERKASTEN,
@@ -516,11 +520,12 @@ class CoreTests(unittest.TestCase):
         self.assertIn("= 3", by_id[1].text)
         self.assertIn("= 40", by_id[34].text)
         self.assertIn("= 44", by_id[34].text)
-        self.assertNotIn("target_level", by_id[15].text)
+        self.assertEqual(self._gate_targets(by_id[15].text), [1])
         self.assertIn("= 15", by_id[75].text)
         self._assert_resistance_campaign_blocked_vehicles_not_enabled(campaign.levels)
         self._assert_resistance_ai_rock_sled_not_used_by_squads(campaign.levels)
         self._assert_black_sect_campaign_blocked_vehicles_not_enabled(campaign.levels)
+        self._assert_black_sect_campaign_blocked_buildings_not_enabled(campaign.levels)
         self._assert_black_sect_rock_sled_not_used_by_squads(campaign.levels)
 
     def test_generator2_metropolis_dawn_ghorkov_campaign_profile(self) -> None:
@@ -542,6 +547,7 @@ class CoreTests(unittest.TestCase):
         self._assert_resistance_campaign_blocked_vehicles_not_enabled(campaign.levels)
         self._assert_resistance_ai_rock_sled_not_used_by_squads(campaign.levels)
         self._assert_black_sect_campaign_blocked_vehicles_not_enabled(campaign.levels)
+        self._assert_black_sect_campaign_blocked_buildings_not_enabled(campaign.levels)
         self._assert_black_sect_rock_sled_not_used_by_squads(campaign.levels)
 
     def test_generator2_metropolis_dawn_taerkasten_campaign_profile(self) -> None:
@@ -563,6 +569,7 @@ class CoreTests(unittest.TestCase):
         self._assert_resistance_campaign_blocked_vehicles_not_enabled(campaign.levels)
         self._assert_resistance_ai_rock_sled_not_used_by_squads(campaign.levels)
         self._assert_black_sect_campaign_blocked_vehicles_not_enabled(campaign.levels)
+        self._assert_black_sect_campaign_blocked_buildings_not_enabled(campaign.levels)
         self._assert_black_sect_rock_sled_not_used_by_squads(campaign.levels)
         self._assert_vehicle_ids_not_enabled(
             campaign.levels,
@@ -918,6 +925,9 @@ class CoreTests(unittest.TestCase):
     def _assert_black_sect_campaign_blocked_vehicles_not_enabled(self, levels) -> None:
         self._assert_campaign_blocked_vehicles_not_enabled(levels, FACTION_BLACK_SECT, "Black Sect")
 
+    def _assert_black_sect_campaign_blocked_buildings_not_enabled(self, levels) -> None:
+        self._assert_campaign_blocked_buildings_not_enabled(levels, FACTION_BLACK_SECT, "Black Sect")
+
     def _assert_campaign_blocked_vehicles_not_enabled(self, levels, owner: int, faction_name: str) -> None:
         found_enable = False
         for level in levels:
@@ -927,6 +937,14 @@ class CoreTests(unittest.TestCase):
             found_enable = True
             self._assert_no_blocked_enable_vehicles(level, vehicles, CAMPAIGN_ENABLE_EXCLUDED_VEHICLE_IDS, faction_name)
         self.assertTrue(found_enable)
+
+    def _assert_campaign_blocked_buildings_not_enabled(self, levels, owner: int, faction_name: str) -> None:
+        for level in levels:
+            buildings = self._enable_building_values(level.text, owner)
+            if not buildings:
+                continue
+            blocked = sorted(BLACK_SECT_ENABLE_EXCLUDED_BUILDING_IDS.intersection(buildings))
+            self.assertFalse(blocked, f"Blocked buildings {blocked} enabled for {faction_name} in level {level.level_id}")
 
     def _assert_vehicle_ids_not_enabled(self, levels, owner: int, faction_name: str, vehicle_ids: set[int]) -> None:
         for level in levels:
@@ -985,6 +1003,14 @@ class CoreTests(unittest.TestCase):
 
     @staticmethod
     def _enable_vehicle_values(text: str, owner: int) -> list[int]:
+        return CoreTests._enable_property_values(text, owner, "vehicle")
+
+    @staticmethod
+    def _enable_building_values(text: str, owner: int) -> list[int]:
+        return CoreTests._enable_property_values(text, owner, "building")
+
+    @staticmethod
+    def _enable_property_values(text: str, owner: int, property_name: str) -> list[int]:
         values: list[int] = []
         in_owner_block = False
         for line in text.splitlines():
@@ -999,7 +1025,7 @@ class CoreTests(unittest.TestCase):
             if not in_owner_block or "=" not in line:
                 continue
             key, value = (part.strip() for part in line.split("=", 1))
-            if key == "vehicle":
+            if key == property_name:
                 values.append(int(value))
         return values
 

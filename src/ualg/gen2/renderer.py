@@ -6,7 +6,12 @@ from math import floor
 
 from .context import _Level
 from .map_builder import Generator2MapBuilder
-from ..constants import GENERATOR2_FACTION_IDS, GENERATOR2_SKIES, TILESET6_BOMB_BLUEPRINTS
+from ..constants import (
+    BLACK_SECT_ENABLE_EXCLUDED_BUILDING_IDS,
+    GENERATOR2_FACTION_IDS,
+    GENERATOR2_SKIES,
+    TILESET6_BOMB_BLUEPRINTS,
+)
 from ..ldf import LDFWriter
 from ..startup_scripts import startup_include_for_level
 
@@ -189,7 +194,7 @@ class Generator2Renderer:
             writer.line(f"begin_enable {GENERATOR2_FACTION_IDS[faction]}")
             for vehicle in self._enabled_vehicles(level, faction):
                 writer.property("vehicle", vehicle)
-            for building in level.buildings_by_faction[faction]:
+            for building in self._enabled_buildings(level, faction):
                 writer.property("building", building)
             writer.end_block()
         writer.line("")
@@ -202,6 +207,13 @@ class Generator2Renderer:
         if faction not in _CAMPAIGN_ENABLE_EXCLUDED_FACTIONS:
             return vehicles
         return [vehicle for vehicle in vehicles if vehicle not in _CAMPAIGN_ENABLE_EXCLUDED_VEHICLE_IDS]
+
+    @staticmethod
+    def _enabled_buildings(level: _Level, faction: str) -> list[int]:
+        buildings = list(level.buildings_by_faction[faction])
+        if faction == "bla":
+            return [building for building in buildings if building not in BLACK_SECT_ENABLE_EXCLUDED_BUILDING_IDS]
+        return buildings
 
     def _write_maps(self, writer: LDFWriter, level: _Level) -> None:
         writer.line("begin_maps")

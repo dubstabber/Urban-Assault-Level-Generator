@@ -27,7 +27,7 @@ class CharacterizationTests(unittest.TestCase):
     def test_generator1_seeded_single_output(self) -> None:
         level = Generator1().generate_single(seed=424242, difficulty=5, skill=6)
 
-        self.assertEqual(_text_hash(level.text), "da1c01bce71729f8d390eafa6eaa14ec237c1b6b6fb29a9f2771331d9f368e75")
+        self.assertEqual(_text_hash(level.text), "885bd7086df1cfcb8b8b2e241111254a6b81e3e58f886e7127ea04c01d37c355")
 
     def test_generator1_seeded_custom_output(self) -> None:
         level = Generator1().generate_custom(
@@ -57,7 +57,7 @@ class CharacterizationTests(unittest.TestCase):
         campaign = Generator1().generate_campaign(seed=13579, difficulty=5)
         md_campaign = Generator1().generate_campaign(seed=1234, campaign_profile="md-ghorkov")
 
-        self.assertEqual(_campaign_hash(campaign), "f93afc3fae8a40e88c6c2aaf82b612013dda07f4cca4b338fe82353a5fd61bf1")
+        self.assertEqual(_campaign_hash(campaign), "13b815bd2dcffbca9b4fa3cc1c0167432c99c18f371d98f8ea43f50da24b3579")
         self.assertEqual(_campaign_hash(md_campaign), "905e9472caad0502003a378d03f9e6add6831f98acb1b4fef0b51b0e7db2f3c0")
 
     def test_generator2_seeded_outputs(self) -> None:
@@ -66,8 +66,8 @@ class CharacterizationTests(unittest.TestCase):
         md_campaign = Generator2().generate_campaign(seed=998877, campaign_profile="md-taerkasten")
 
         self.assertEqual(_text_hash(single.text), "ab9f5be7cb6195a031a9ee4df12948a2cf340aaea37677e23539768cb0944118")
-        self.assertEqual(_campaign_hash(campaign), "b2835debf2ab47804db65a91b0f26423998ca0dc1610329c9f67149e0df36174")
-        self.assertEqual(_campaign_hash(md_campaign), "ecfd17c9ad8dea2e27a9d8f1b006ac9c5a3fd28947b95b7bfa76d264643ed1fc")
+        self.assertEqual(_campaign_hash(campaign), "cf43e164f80a25b5bb771728fc1d6d61d352b18952323317276842bb7a5e64a7")
+        self.assertEqual(_campaign_hash(md_campaign), "fc5cc1b53c100592e8b1c880ef2569a620a3a7aab2f86fe856a05559a6bc107a")
 
 
 if __name__ == "__main__":
