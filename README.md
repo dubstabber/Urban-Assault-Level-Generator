@@ -12,16 +12,6 @@ Compatibility policy:
 - `generator1` defaults to improved playable output. Use `--strict-parity` to disable the improved tileset filtering path where supported.
 - `generator2` follows the PHP legacy `SET_LIST` terrain allowlists instead of the broader shared tileset compatibility table.
 
-## Credits
-
-- Python reimplementation: Ydro.
-- Generator2 legacy/PHP generator: GitHub user `dportalesr`.
-- Original Random UA.exe: Daniel L. Orlando.
-
-## License
-
-This project is licensed under GPL-3.0-or-later. See [LICENSE](LICENSE).
-
 ## Requirements
 
 - Python 3.11 or newer.
@@ -76,3 +66,13 @@ Run tests:
 $env:PYTHONPATH = "src"
 python -B -m unittest discover -s tests
 ```
+
+## Credits
+
+- Python reimplementation: Ydro.
+- Generator2 legacy/PHP generator: GitHub user `dportalesr`.
+- Original Random UA.exe: Daniel L. Orlando.
+
+## License
+
+This project is licensed under GPL-3.0-or-later. See [LICENSE](LICENSE).
