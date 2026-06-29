@@ -10,6 +10,7 @@ from ..models import GeneratedCampaign, GeneratedLevel
 from ..rng import MSVCRTRandom
 from .builder import Generator4Builder
 from .context import _Gen4Level
+from .difficulty import normalize_difficulty_mode
 from .profiles import Generator4ProfileResolver
 from .renderer import Generator4Renderer
 from .rules import Archetype, archetype_for_level, archetype_for_source_level, archetypes_for_profile, rules_version
@@ -34,9 +35,11 @@ class Generator4:
         level_id: int | None = None,
         zero_enemy_radar_budgets: bool = False,
         zero_enemy_station_delays: bool = False,
+        difficulty_mode: str = "normal",
     ) -> GeneratedLevel:
         profile_id = self.profiles.normalize_campaign_profile(campaign_profile)
         profile = self.profiles.get(profile_id)
+        difficulty_mode = normalize_difficulty_mode(difficulty_mode)
         seed = self._normalize_seed(seed)
         rng = MSVCRTRandom(seed)
         archetype = (
@@ -53,6 +56,7 @@ class Generator4:
             rewire_targets=False,
             zero_enemy_radar_budgets=zero_enemy_radar_budgets,
             zero_enemy_station_delays=zero_enemy_station_delays,
+            difficulty_mode=difficulty_mode,
         )
 
     def generate_campaign(
@@ -62,9 +66,11 @@ class Generator4:
         *,
         zero_enemy_radar_budgets: bool = False,
         zero_enemy_station_delays: bool = False,
+        difficulty_mode: str = "normal",
     ) -> GeneratedCampaign:
         profile_id = self.profiles.normalize_campaign_profile(campaign_profile)
         profile = self.profiles.get(profile_id)
+        difficulty_mode = normalize_difficulty_mode(difficulty_mode)
         seed = self._normalize_seed(seed)
         rng = MSVCRTRandom(seed)
         levels: list[GeneratedLevel] = []
@@ -80,6 +86,7 @@ class Generator4:
                     rewire_targets=True,
                     zero_enemy_radar_budgets=zero_enemy_radar_budgets,
                     zero_enemy_station_delays=zero_enemy_station_delays,
+                    difficulty_mode=difficulty_mode,
                 )
             )
         return GeneratedCampaign(seed=seed, levels=levels)
@@ -95,6 +102,7 @@ class Generator4:
         rewire_targets: bool,
         zero_enemy_radar_budgets: bool,
         zero_enemy_station_delays: bool,
+        difficulty_mode: str,
     ) -> GeneratedLevel:
         last_level: _Gen4Level | None = None
         last_text = ""
@@ -108,6 +116,7 @@ class Generator4:
                 archetype,
                 zero_enemy_radar_budgets,
                 zero_enemy_station_delays,
+                difficulty_mode,
             )
             self.builder.build(level)
             if rewire_targets:
@@ -129,6 +138,7 @@ class Generator4:
         archetype: Archetype,
         zero_enemy_radar_budgets: bool,
         zero_enemy_station_delays: bool,
+        difficulty_mode: str,
     ) -> _Gen4Level:
         return _Gen4Level(
             level_id=archetype.level_id,
@@ -140,6 +150,7 @@ class Generator4:
             archetype=archetype,
             zero_enemy_radar_budgets=zero_enemy_radar_budgets,
             zero_enemy_station_delays=zero_enemy_station_delays,
+            difficulty_mode=difficulty_mode,
         )
 
     def _archetypes_for_profile(self, profile_id: str, profile: CampaignProfile) -> tuple[Archetype, ...]:
@@ -166,6 +177,7 @@ class Generator4:
         metadata = {
             "generator": "generator4",
             "campaign_profile": level.profile_id,
+            "difficulty_mode": level.difficulty_mode,
             "source": level.source,
             "level_archetype": level.archetype.name,
             "rules_version": rules_version(),

@@ -33,6 +33,7 @@ from ..startup_scripts import startup_include_for_level
 from ..gen3.corpus import skeletons_for_source
 from ..gen3.synthesis import adjacency_model_for, border_tile, synthesize_typ_map
 from .context import _Gen4Level
+from .difficulty import is_extremely_hard, is_hard_or_harder
 from .infrastructure import station_counts, synthesize_infrastructure
 from .passability import required_cells_connected, synthesize_hgt_map, terrain_metrics
 
@@ -159,6 +160,8 @@ class Generator4Builder:
             owner = int(owner_text)
             data = enemy_enables[owner_text]
             vehicles = self._filter_enable_vehicles(level.profile_id, owner, data.get("vehicles", []))
+            if is_extremely_hard(level.difficulty_mode):
+                vehicles = self._expand_extreme_enemy_vehicles(level, owner, vehicles)
             buildings = self._filter_enable_buildings(owner, data.get("buildings", []))
             enables.append({"owner": owner, "vehicles": vehicles, "buildings": buildings})
             legal[owner] = set(vehicles)
@@ -186,6 +189,20 @@ class Generator4Builder:
             return [int(building) for building in buildings if int(building) not in BLACK_SECT_ENABLE_EXCLUDED_BUILDING_IDS]
         return [int(building) for building in buildings]
 
+    def _expand_extreme_enemy_vehicles(self, level: _Gen4Level, owner: int, vehicles: list[int]) -> list[int]:
+        roster = self._filter_enable_vehicles(
+            level.profile_id,
+            owner,
+            list(level.profile.roster.vehicles_by_faction.get(owner, ())),
+        )
+        result = list(dict.fromkeys(int(vehicle) for vehicle in vehicles))
+        for vehicle in roster:
+            if vehicle not in result:
+                result.append(vehicle)
+            if len(result) >= len(vehicles) + 3:
+                break
+        return result
+
     # -- placement ------------------------------------------------------------
 
     def _place_hosts(self, level: _Gen4Level) -> list[dict[str, Any]]:
@@ -212,8 +229,47 @@ class Generator4Builder:
             })
         if not any(host["is_player"] for host in hosts):
             cell = self._fallback_cell(level, occupied)
+            occupied.add(cell)
             hosts.insert(0, {"faction": level.player_faction, "source_owner": level.archetype.player_owner, "source": {}, "x": cell[0], "y": cell[1], "is_player": True, "index": 0})
+        if is_extremely_hard(level.difficulty_mode):
+            self._maybe_add_extra_enemy_hosts(level, hosts, occupied)
         return hosts[:7]
+
+    def _maybe_add_extra_enemy_hosts(
+        self,
+        level: _Gen4Level,
+        hosts: list[dict[str, Any]],
+        occupied: set[tuple[int, int]],
+    ) -> None:
+        by_faction: dict[int, list[dict[str, Any]]] = {}
+        for host in hosts:
+            faction = int(host["faction"])
+            if faction in {0, _FACTION_TUTOR, level.player_faction}:
+                continue
+            by_faction.setdefault(faction, []).append(host)
+        for faction in sorted(by_faction):
+            if len(hosts) >= 7:
+                return
+            if level.rng.rand_mod(100) >= 30:
+                continue
+            template = by_faction[faction][0]
+            source = dict(template.get("source", {}))
+            source["owner"] = source.get("owner", template.get("source_owner", faction))
+            source_cell = (int(template["x"]), int(template["y"]))
+            cell = self._jitter_cell(level, source_cell, occupied, radius=6)
+            occupied.add(cell)
+            hosts.append(
+                {
+                    "faction": faction,
+                    "source_owner": int(template.get("source_owner", faction)),
+                    "source": source,
+                    "x": cell[0],
+                    "y": cell[1],
+                    "is_player": False,
+                    "index": len(hosts),
+                    "extra_host": True,
+                }
+            )
 
     def _place_gates(self, level: _Gen4Level, occupied: set[tuple[int, int]]) -> list[dict[str, Any]]:
         gates: list[dict[str, Any]] = []
@@ -389,22 +445,27 @@ class Generator4Builder:
         infrastructure: list[dict[str, Any]],
     ) -> MapRows:
         rows = filled_rows(level.width, level.height, 0)
+        hard_mode = is_hard_or_harder(level.difficulty_mode)
         seeds: list[dict[str, Any]] = [
             {"x": host["x"], "y": host["y"], "faction": host["faction"]}
             for host in hosts
-            if host["faction"] != _FACTION_TUTOR
+            if host["faction"] != _FACTION_TUTOR and not (hard_mode and int(host["faction"]) == level.player_faction)
         ]
         seeds.extend(
             {"x": item["x"], "y": item["y"], "faction": item["owner"]}
             for item in infrastructure
             if int(item.get("owner", 0)) not in {0, _FACTION_TUTOR}
+            and not (hard_mode and int(item.get("owner", 0)) == level.player_faction)
         )
-        if not seeds:
-            return rows
-        for y in range(1, level.height - 1):
-            for x in range(1, level.width - 1):
-                nearest = min(seeds, key=lambda host: (host["x"] - x) ** 2 + (host["y"] - y) ** 2)
-                rows[y][x] = int(nearest["faction"])
+        if seeds:
+            for y in range(1, level.height - 1):
+                for x in range(1, level.width - 1):
+                    nearest = min(seeds, key=lambda host: (host["x"] - x) ** 2 + (host["y"] - y) ** 2)
+                    rows[y][x] = int(nearest["faction"])
+        if hard_mode:
+            for host in hosts:
+                if int(host["faction"]) == level.player_faction:
+                    rows[int(host["y"])][int(host["x"])] = level.player_faction
         for item in infrastructure:
             rows[int(item["y"])][int(item["x"])] = int(item["owner"])
         return rows
@@ -540,7 +601,7 @@ class Generator4Builder:
         is_player = bool(host["is_player"])
         out: dict[str, Any] = {"owner": faction}
         out["vehicle"] = self._player_vehicle(level, source) if is_player else self._host_vehicle(level, faction, source)
-        energy = int(source.get("energy", 600000 if is_player else 1200000))
+        energy = self._host_energy(level, source, faction, is_player)
         out.update({
             "pos_x": sector_to_world_x(host["x"], plus_one=True),
             "pos_y": int(source.get("pos_y", -300)),
@@ -563,6 +624,15 @@ class Generator4Builder:
                 else:
                     out[key] = value
         return out
+
+    @staticmethod
+    def _host_energy(level: _Gen4Level, source: dict[str, Any], faction: int, is_player: bool) -> int:
+        energy = int(source.get("energy", 600000 if is_player else 1200000))
+        if is_player and is_extremely_hard(level.difficulty_mode):
+            return max(150000, min(energy, level.rng.rand_range(3, 5) * 100000) * 2 // 3)
+        if not is_player and faction != _FACTION_TUTOR and is_hard_or_harder(level.difficulty_mode):
+            return max(energy, level.rng.rand_range(8, 22) * 100000)
+        return energy
 
     def _player_vehicle(self, level: _Gen4Level, source: dict[str, Any]) -> int:
         by_level = level.profile.player_robo_by_level.get(level.level_id)

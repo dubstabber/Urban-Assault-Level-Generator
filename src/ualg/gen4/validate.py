@@ -6,6 +6,10 @@ import re
 
 from ..constants import (
     BUILDING_TYP_BY_ID,
+    ENABLE_EXCLUDED_VEHICLE_IDS,
+    FACTION_BLACK_SECT,
+    FACTION_TAERKASTEN,
+    MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS,
     STANDARD_BOMB_BLUEPRINTS,
     TECH_UPGRADE_BUILDING_TILESETS,
     TECH_UPGRADE_BUILDING_TYP_BY_ID,
@@ -30,6 +34,7 @@ from ..ldf import parse_maps
 from ..models import MapRows
 from ..gen3.validate import validate_level as validate_gen3_level
 from .context import _Gen4Level
+from .difficulty import is_extremely_hard
 from .infrastructure import station_info_by_building
 from .passability import route_blockers
 
@@ -132,13 +137,25 @@ def _validate_enables(level: _Gen4Level) -> list[str]:
         if owner not in source_enables:
             problems.append(f"begin_enable owner {owner} is not legal for archetype")
             continue
-        illegal_vehicles = set(int(v) for v in enable.get("vehicles", [])) - source_enables[owner]["vehicles"]
+        allowed_vehicles = set(source_enables[owner]["vehicles"])
+        if is_extremely_hard(getattr(level, "difficulty_mode", "normal")):
+            allowed_vehicles.update(_extreme_vehicle_pool(level, owner))
+        illegal_vehicles = set(int(v) for v in enable.get("vehicles", [])) - allowed_vehicles
         illegal_buildings = set(int(b) for b in enable.get("buildings", [])) - source_enables[owner]["buildings"]
         if illegal_vehicles:
             problems.append(f"begin_enable owner {owner} has illegal vehicles")
         if illegal_buildings:
             problems.append(f"begin_enable owner {owner} has illegal buildings")
     return problems
+
+
+def _extreme_vehicle_pool(level: _Gen4Level, owner: int) -> set[int]:
+    vehicles = set(int(vehicle) for vehicle in level.profile.roster.vehicles_by_faction.get(owner, ()))
+    if owner in {level.player_faction, FACTION_BLACK_SECT}:
+        vehicles -= set(ENABLE_EXCLUDED_VEHICLE_IDS)
+    if level.profile_id == "md-taerkasten" and owner in {FACTION_TAERKASTEN, FACTION_BLACK_SECT}:
+        vehicles -= set(MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS)
+    return vehicles
 
 
 def _validate_squads(level: _Gen4Level) -> list[str]:

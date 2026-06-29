@@ -15,6 +15,7 @@ from .generator1 import Generator1
 from .generator2 import Generator2
 from .generator3 import Generator3
 from .generator4 import Generator4
+from .gen4.difficulty import GENERATOR4_DIFFICULTY_MODES
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -152,6 +153,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     gen4_single.add_argument("--level-id", type=int, default=None, help="Use this campaign slot as the archetype")
     gen4_single.add_argument(
+        "--difficulty-mode",
+        choices=GENERATOR4_DIFFICULTY_MODES,
+        default="normal",
+        help="Generator4 difficulty tuning mode",
+    )
+    gen4_single.add_argument(
         "--zero-enemy-radar-budgets",
         action="store_true",
         help="Set all enemy host station rad_budget values to 0",
@@ -169,6 +176,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=GENERATOR4_CAMPAIGN_PROFILES,
         default="original",
         help="Generator4 campaign profile/archetype set",
+    )
+    gen4_campaign.add_argument(
+        "--difficulty-mode",
+        choices=GENERATOR4_DIFFICULTY_MODES,
+        default="normal",
+        help="Generator4 difficulty tuning mode",
     )
     gen4_campaign.add_argument(
         "--zero-enemy-radar-budgets",
@@ -268,6 +281,7 @@ def main(argv: list[str] | None = None) -> int:
             seed=args.seed,
             campaign_profile=args.campaign_profile,
             level_id=args.level_id,
+            difficulty_mode=args.difficulty_mode,
             zero_enemy_radar_budgets=args.zero_enemy_radar_budgets,
             zero_enemy_station_delays=args.zero_enemy_station_delays,
         )
@@ -277,6 +291,7 @@ def main(argv: list[str] | None = None) -> int:
     campaign = generator.generate_campaign(
         seed=args.seed,
         campaign_profile=args.campaign_profile,
+        difficulty_mode=args.difficulty_mode,
         zero_enemy_radar_budgets=args.zero_enemy_radar_budgets,
         zero_enemy_station_delays=args.zero_enemy_station_delays,
     )

@@ -188,6 +188,7 @@ ualg gen4 single --seed 12345 --campaign-profile original --level-id 2 --output 
 | `--seed SEED` | No | `0` | Integer RNG seed. `0` uses the current time. |
 | `--campaign-profile {original,md-ghorkov,md-taerkasten}` | No | `original` | Campaign profile/archetype set. |
 | `--level-id ID` | No | None | Campaign slot to use as the archetype. When omitted, one profile slot is chosen from the seed. |
+| `--difficulty-mode {normal,hard,extremely-hard}` | No | `normal` | Difficulty tuning. Hard reduces player ownership/stations and raises enemy energy; extremely hard also lowers player energy, expands enemy unit enables, and can add enemy hosts. |
 | `--zero-enemy-radar-budgets` | No | Off | Set all enemy host station `rad_budget` values to `0`. |
 | `--zero-enemy-station-delays` | No | Off | Set all enemy host station `*_delay` values to `0`. |
 | `--output OUTPUT` | Yes | None | Output `.ldf` file path. Parent directories are created automatically. |
@@ -204,6 +205,7 @@ ualg gen4 campaign --seed 12345 --campaign-profile md-ghorkov --output-dir out/g
 | --- | --- | --- | --- |
 | `--seed SEED` | No | `0` | Integer RNG seed. `0` uses the current time. |
 | `--campaign-profile {original,md-ghorkov,md-taerkasten}` | No | `original` | Campaign profile/archetype set. |
+| `--difficulty-mode {normal,hard,extremely-hard}` | No | `normal` | Difficulty tuning applied to every generated level. |
 | `--zero-enemy-radar-budgets` | No | Off | Set all enemy host station `rad_budget` values to `0`. |
 | `--zero-enemy-station-delays` | No | Off | Set all enemy host station `*_delay` values to `0`. |
 | `--output-dir OUTPUT_DIR` | Yes | None | Directory where campaign `.ldf` files are written. The directory is created automatically. |

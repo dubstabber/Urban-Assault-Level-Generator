@@ -22,6 +22,7 @@ class _Gen4Level:
     archetype: Archetype
     zero_enemy_radar_budgets: bool = False
     zero_enemy_station_delays: bool = False
+    difficulty_mode: str = "normal"
 
     mode: str = "hybrid-synthesis"
     source: str = ""

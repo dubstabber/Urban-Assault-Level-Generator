@@ -85,6 +85,7 @@ class GuiHelperTests(unittest.TestCase):
             generator3_zero_enemy_radar_budgets=True,
             generator4_single_level_file=str(self.tmp_path / "gen4_single.ldf"),
             generator4_campaign_directory=str(self.tmp_path / "gen4_campaign"),
+            generator4_difficulty_mode="extremely-hard",
             generator4_zero_enemy_station_delays=True,
             generator4_zero_enemy_radar_budgets=True,
         )
@@ -345,6 +346,7 @@ class GuiHelperTests(unittest.TestCase):
                     "[Generator4]",
                     "SingleLevelFile=C:/levels/gen4.ldf",
                     "CampaignDirectory=C:/levels/gen4camp",
+                    "DifficultyMode=hard",
                     "ZeroEnemyStationDelays=1",
                     "ZeroEnemyRadarBudgets=1",
                 ]
@@ -356,6 +358,7 @@ class GuiHelperTests(unittest.TestCase):
 
         self.assertEqual(loaded.generator4_single_level_file, "C:/levels/gen4.ldf")
         self.assertEqual(loaded.generator4_campaign_directory, "C:/levels/gen4camp")
+        self.assertEqual(loaded.generator4_difficulty_mode, "hard")
         self.assertTrue(loaded.generator4_zero_enemy_station_delays)
         self.assertTrue(loaded.generator4_zero_enemy_radar_budgets)
 

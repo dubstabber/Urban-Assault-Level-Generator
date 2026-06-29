@@ -36,6 +36,7 @@ class GuiSettings:
     generator3_zero_enemy_radar_budgets: bool = False
     generator4_single_level_file: str = ""
     generator4_campaign_directory: str = ""
+    generator4_difficulty_mode: str = "normal"
     generator4_zero_enemy_station_delays: bool = False
     generator4_zero_enemy_radar_budgets: bool = False
 
@@ -79,6 +80,7 @@ def load_settings(path: str | Path | None = None) -> GuiSettings:
         ),
         generator4_single_level_file=_get_option(parser, GENERATOR4_SECTION, "SingleLevelFile"),
         generator4_campaign_directory=_get_option(parser, GENERATOR4_SECTION, "CampaignDirectory"),
+        generator4_difficulty_mode=_get_option(parser, GENERATOR4_SECTION, "DifficultyMode", default="normal"),
         generator4_zero_enemy_station_delays=_truthy(
             _get_option(parser, GENERATOR4_SECTION, "ZeroEnemyStationDelays", default="0")
         ),
@@ -122,6 +124,7 @@ def save_settings(settings: GuiSettings, path: str | Path | None = None) -> Path
     parser[GENERATOR4_SECTION] = {
         "SingleLevelFile": settings.generator4_single_level_file,
         "CampaignDirectory": settings.generator4_campaign_directory,
+        "DifficultyMode": settings.generator4_difficulty_mode,
         "ZeroEnemyStationDelays": "1" if settings.generator4_zero_enemy_station_delays else "0",
         "ZeroEnemyRadarBudgets": "1" if settings.generator4_zero_enemy_radar_budgets else "0",
     }

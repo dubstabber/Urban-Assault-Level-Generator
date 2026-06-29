@@ -18,6 +18,7 @@ from ..constants import (
     level_filename,
 )
 from ..generator1 import Generator1CustomOptions
+from ..gen4.difficulty import GENERATOR4_DIFFICULTY_MODES
 from ..legacy_resources import LegacyDialog
 from .custom_wizard import CustomWizardDialog
 from .legacy_dialogs import (
@@ -159,6 +160,7 @@ class Generator1GUI:
         self.generator4_single_profile_var = tk.StringVar(value="original")
         self.generator4_campaign_profile_var = tk.StringVar(value="original")
         self.generator4_level_id_var = tk.StringVar(value="")
+        self.generator4_difficulty_mode_var = tk.StringVar(value=settings.generator4_difficulty_mode)
         self.generator4_zero_enemy_station_delays_var = tk.BooleanVar(
             value=settings.generator4_zero_enemy_station_delays
         )
@@ -502,17 +504,25 @@ class Generator1GUI:
 
         options = tk.LabelFrame(outer, text="Options", padx=8, pady=8)
         options.grid(row=1, column=0, sticky="ew", pady=(6, 0))
+        tk.Label(options, text="Difficulty mode:", anchor="w").grid(row=0, column=0, sticky="w", padx=(0, 6), pady=2)
+        ttk.Combobox(
+            options,
+            textvariable=self.generator4_difficulty_mode_var,
+            values=list(GENERATOR4_DIFFICULTY_MODES),
+            state="readonly",
+            width=18,
+        ).grid(row=0, column=1, sticky="w", pady=2)
         tk.Checkbutton(
             options,
             text="Set enemy host station delays to 0",
             variable=self.generator4_zero_enemy_station_delays_var,
-        ).grid(row=0, column=0, sticky="w")
+        ).grid(row=1, column=0, columnspan=2, sticky="w")
         radar_check = tk.Checkbutton(
             options,
             text="Disable enemy radar budgets",
             variable=self.generator4_zero_enemy_radar_budgets_var,
         )
-        radar_check.grid(row=1, column=0, sticky="w")
+        radar_check.grid(row=2, column=0, columnspan=2, sticky="w")
         self._add_tooltip(radar_check, ENEMY_RADAR_BUDGET_TOOLTIP)
 
         single = tk.LabelFrame(outer, text="Single Level", padx=8, pady=8)
@@ -999,6 +1009,7 @@ class Generator1GUI:
             seed=seed,
             campaign_profile=self.generator4_single_profile_var.get().strip() or "original",
             level_id=level_id,
+            difficulty_mode=self.generator4_difficulty_mode_var.get().strip() or "normal",
             zero_enemy_station_delays=self.generator4_zero_enemy_station_delays_var.get(),
             zero_enemy_radar_budgets=self.generator4_zero_enemy_radar_budgets_var.get(),
         )
@@ -1016,6 +1027,7 @@ class Generator1GUI:
             directory,
             seed=seed,
             campaign_profile=self.generator4_campaign_profile_var.get().strip() or "original",
+            difficulty_mode=self.generator4_difficulty_mode_var.get().strip() or "normal",
             zero_enemy_station_delays=self.generator4_zero_enemy_station_delays_var.get(),
             zero_enemy_radar_budgets=self.generator4_zero_enemy_radar_budgets_var.get(),
         )
@@ -1027,6 +1039,7 @@ class Generator1GUI:
         seed: int,
         campaign_profile: str,
         level_id: int | None,
+        difficulty_mode: str,
         zero_enemy_station_delays: bool,
         zero_enemy_radar_budgets: bool,
     ) -> None:
@@ -1040,6 +1053,7 @@ class Generator1GUI:
                 seed=seed,
                 campaign_profile=campaign_profile,
                 level_id=level_id,
+                difficulty_mode=difficulty_mode,
                 zero_enemy_radar_budgets=zero_enemy_radar_budgets,
                 zero_enemy_station_delays=zero_enemy_station_delays,
             ),
@@ -1053,6 +1067,7 @@ class Generator1GUI:
         *,
         seed: int,
         campaign_profile: str,
+        difficulty_mode: str,
         zero_enemy_station_delays: bool,
         zero_enemy_radar_budgets: bool,
     ) -> None:
@@ -1065,6 +1080,7 @@ class Generator1GUI:
                 directory,
                 seed=seed,
                 campaign_profile=campaign_profile,
+                difficulty_mode=difficulty_mode,
                 zero_enemy_radar_budgets=zero_enemy_radar_budgets,
                 zero_enemy_station_delays=zero_enemy_station_delays,
             ),
@@ -1379,6 +1395,7 @@ class Generator1GUI:
             generator3_zero_enemy_radar_budgets=self.generator3_zero_enemy_radar_budgets_var.get(),
             generator4_single_level_file=self.generator4_single_file_var.get().strip(),
             generator4_campaign_directory=self.generator4_campaign_dir_var.get().strip(),
+            generator4_difficulty_mode=self.generator4_difficulty_mode_var.get().strip() or "normal",
             generator4_zero_enemy_station_delays=self.generator4_zero_enemy_station_delays_var.get(),
             generator4_zero_enemy_radar_budgets=self.generator4_zero_enemy_radar_budgets_var.get(),
         )

@@ -303,6 +303,77 @@ class GenerationTests(unittest.TestCase):
         self.assertTrue(scout_distances)
         self.assertLessEqual(min(scout_distances), 5)
 
+    def test_hard_mode_reduces_player_territory_and_starting_stations(self) -> None:
+        normal = self.generator.generate_single(seed=2026, campaign_profile="original", level_id=52)
+        hard = self.generator.generate_single(seed=2026, campaign_profile="original", level_id=52, difficulty_mode="hard")
+
+        normal_player_cells = sum(1 for row in normal.maps["own"] for owner in row if int(owner) == 1)
+        hard_player_cells = sum(1 for row in hard.maps["own"] for owner in row if int(owner) == 1)
+        hard_hosts = {_world_cell(robo) for robo in parse_ldf(hard.text).robos}
+        hard_stations = _station_cells(hard)
+        player_power = [
+            (x, y)
+            for x, y, category, owner in hard_stations
+            if category == "power" and owner == 1 and (x, y) not in hard_hosts
+        ]
+        player_flak = [(x, y) for x, y, category, owner in hard_stations if category == "flak" and owner == 1]
+
+        self.assertEqual(hard.metadata["difficulty_mode"], "hard")
+        self.assertLess(hard_player_cells, normal_player_cells)
+        self.assertLessEqual(hard_player_cells, 8)
+        self.assertEqual(player_power, [])
+        self.assertLessEqual(len(player_flak), 1)
+
+    def test_hard_mode_raises_enemy_host_energy(self) -> None:
+        normal = parse_ldf(self.generator.generate_single(seed=2026, campaign_profile="original", level_id=2).text)
+        hard = parse_ldf(
+            self.generator.generate_single(seed=2026, campaign_profile="original", level_id=2, difficulty_mode="hard").text
+        )
+
+        normal_enemy_energy = [int(robo["energy"]) for robo in normal.robos if int(robo["owner"]) != 1]
+        hard_enemy_energy = [int(robo["energy"]) for robo in hard.robos if int(robo["owner"]) != 1]
+
+        self.assertEqual(len(hard_enemy_energy), len(normal_enemy_energy))
+        for hard_energy, normal_energy in zip(hard_enemy_energy, normal_enemy_energy, strict=True):
+            self.assertGreaterEqual(hard_energy, normal_energy)
+            self.assertGreaterEqual(hard_energy, 800000)
+
+    def test_extremely_hard_lowers_player_energy_and_expands_enemy_enables(self) -> None:
+        normal = parse_ldf(self.generator.generate_single(seed=2026, campaign_profile="original", level_id=2).text)
+        extreme_level = self.generator.generate_single(
+            seed=2026,
+            campaign_profile="original",
+            level_id=2,
+            difficulty_mode="extremely-hard",
+        )
+        extreme = parse_ldf(extreme_level.text)
+
+        normal_player = next(robo for robo in normal.robos if int(robo["owner"]) == 1)
+        extreme_player = next(robo for robo in extreme.robos if int(robo["owner"]) == 1)
+        normal_enemy_enable_count = sum(len(enable.get("vehicles", [])) for enable in normal.enables if int(enable["owner"]) != 1)
+        extreme_enemy_enable_count = sum(len(enable.get("vehicles", [])) for enable in extreme.enables if int(enable["owner"]) != 1)
+
+        self.assertEqual(extreme_level.metadata["difficulty_mode"], "extremely-hard")
+        self.assertLess(int(extreme_player["energy"]), int(normal_player["energy"]))
+        self.assertGreater(extreme_enemy_enable_count, normal_enemy_enable_count)
+
+    def test_extremely_hard_can_add_extra_enemy_host_station(self) -> None:
+        normal = parse_ldf(self.generator.generate_single(seed=3, campaign_profile="original", level_id=2).text)
+        extreme = parse_ldf(
+            self.generator.generate_single(
+                seed=3,
+                campaign_profile="original",
+                level_id=2,
+                difficulty_mode="extremely-hard",
+            ).text
+        )
+
+        self.assertGreater(len(extreme.robos), len(normal.robos))
+        self.assertGreater(
+            sum(1 for robo in extreme.robos if int(robo["owner"]) != 1),
+            sum(1 for robo in normal.robos if int(robo["owner"]) != 1),
+        )
+
     def test_campaign_rewires_gate_targets(self) -> None:
         campaign = self.generator.generate_campaign(seed=5, campaign_profile="md-ghorkov")
         profile = self.generator.profiles.get("md-ghorkov")

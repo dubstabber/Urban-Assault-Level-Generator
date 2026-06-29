@@ -10,6 +10,7 @@ from typing import Any
 from ..constants import BUILDING_TYP_BY_ID
 from ..data import ua_data
 from ..models import MapRows
+from .difficulty import is_hard_or_harder
 from .passability import required_cells_connected
 
 _ICON_TO_CATEGORY = {
@@ -181,9 +182,10 @@ def _target_requests(
 
     player_owner = int(level.player_faction)
     interior = max(1, (level.width - 2) * (level.height - 2))
-    if source_counts.get("power", 0) > 0 and interior >= 64 and (player_owner, "power") not in seen:
+    hard_mode = is_hard_or_harder(getattr(level, "difficulty_mode", "normal"))
+    if not hard_mode and source_counts.get("power", 0) > 0 and interior >= 64 and (player_owner, "power") not in seen:
         requests.append({"owner": player_owner, "category": "power", "count": 1})
-    if source_counts.get("flak", 0) >= 4 and interior >= 100 and (player_owner, "flak") not in seen:
+    if not hard_mode and source_counts.get("flak", 0) >= 4 and interior >= 100 and (player_owner, "flak") not in seen:
         requests.append({"owner": player_owner, "category": "flak", "count": 2 if has_bomb else 1})
 
     requests.sort(key=lambda request: (0 if int(request["owner"]) == player_owner else 1, _CATEGORIES.index(str(request["category"])), int(request["owner"])))
@@ -205,6 +207,11 @@ def _scaled_owner_target(level: Any, category: str, owner: int, source_count: in
     interior = max(1, (level.width - 2) * (level.height - 2))
     large = interior >= 400
     huge = interior >= 900
+    if is_player and is_hard_or_harder(getattr(level, "difficulty_mode", "normal")):
+        if category == "power":
+            return 0
+        if category == "flak":
+            return 1 if source_count >= 8 and level.rng.rand_mod(100) < 20 else 0
     if category == "power":
         base = max(1, round((source_count ** 0.5) * 0.85))
         if owner == _FACTION_TUTOR:

@@ -201,6 +201,7 @@ def generate_generator4_single(
     seed: int,
     campaign_profile: str,
     level_id: int | None = None,
+    difficulty_mode: str = "normal",
     zero_enemy_radar_budgets: bool = False,
     zero_enemy_station_delays: bool = False,
 ) -> LevelGenerationResult:
@@ -210,6 +211,7 @@ def generate_generator4_single(
         seed=seed,
         campaign_profile=campaign_profile,
         level_id=level_id,
+        difficulty_mode=difficulty_mode,
         zero_enemy_radar_budgets=zero_enemy_radar_budgets,
         zero_enemy_station_delays=zero_enemy_station_delays,
     )
@@ -222,6 +224,7 @@ def generate_generator4_campaign(
     *,
     seed: int,
     campaign_profile: str,
+    difficulty_mode: str = "normal",
     zero_enemy_radar_budgets: bool = False,
     zero_enemy_station_delays: bool = False,
 ) -> CampaignGenerationResult:
@@ -230,6 +233,7 @@ def generate_generator4_campaign(
     campaign = Generator4().generate_campaign(
         seed=seed,
         campaign_profile=campaign_profile,
+        difficulty_mode=difficulty_mode,
         zero_enemy_radar_budgets=zero_enemy_radar_budgets,
         zero_enemy_station_delays=zero_enemy_station_delays,
     )

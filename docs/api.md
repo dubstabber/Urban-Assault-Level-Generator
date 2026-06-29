@@ -250,6 +250,7 @@ generate_single(
     mode: str = "remix",
     skeleton: str | None = None,
     level_id: int | None = None,
+    difficulty_mode: str = "normal",
     zero_enemy_radar_budgets: bool = False,
     zero_enemy_station_delays: bool = False,
 ) -> GeneratedLevel
@@ -334,11 +335,12 @@ generate_single(
 | `seed` | `0` | Integer RNG seed. `0` uses the current time. |
 | `campaign_profile` | `"original"` | Campaign profile/archetype set: `"original"`, `"md-ghorkov"`, or `"md-taerkasten"`. |
 | `level_id` | `None` | Campaign slot to use as the archetype. When omitted, one slot is chosen from the seed. |
+| `difficulty_mode` | `"normal"` | `"normal"` preserves current behavior; `"hard"` reduces player territory/stations and raises enemy host energy; `"extremely-hard"` also lowers player host energy, expands enemy unit enables, and can add extra enemy hosts. |
 | `zero_enemy_radar_budgets` | `False` | Set all enemy host station `rad_budget` values to `0`. |
 | `zero_enemy_station_delays` | `False` | Set all enemy host station `*_delay` values to `0`. |
 
 Metadata includes `"generator": "generator4"`, `"level_archetype"`,
-`"source"`, `"rules_version"`, `"tech_phase"`, `"terrain_profile"`,
+`"difficulty_mode"`, `"source"`, `"rules_version"`, `"tech_phase"`, `"terrain_profile"`,
 `"infrastructure_profile"`, `"synth_method"`, and `"warnings"`.
 
 ### `generate_campaign`
@@ -357,6 +359,7 @@ generate_campaign(
     seed: int = 0,
     campaign_profile: str = "original",
     *,
+    difficulty_mode: str = "normal",
     zero_enemy_radar_budgets: bool = False,
     zero_enemy_station_delays: bool = False,
 ) -> GeneratedCampaign

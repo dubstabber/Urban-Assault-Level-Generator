@@ -34,6 +34,7 @@ python -m ualg.cli gen3 single --seed 12345 --skeleton L1515 --output out/remix.
 python -m ualg.cli gen3 single --seed 12345 --synthesis --output out/synth.ldf
 python -m ualg.cli gen3 campaign --seed 12345 --output-dir out/gen3
 python -m ualg.cli gen4 single --seed 12345 --level-id 2 --output out/gen4.ldf
+python -m ualg.cli gen4 single --seed 12345 --level-id 2 --difficulty-mode hard --output out/gen4-hard.ldf
 python -m ualg.cli gen4 campaign --seed 12345 --output-dir out/gen4
 ```
 
