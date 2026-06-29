@@ -6,6 +6,14 @@ import re
 
 from ..constants import (
     BUILDING_TYP_BY_ID,
+    STANDARD_BOMB_BLUEPRINTS,
+    TECH_UPGRADE_BUILDING_TILESETS,
+    TECH_UPGRADE_BUILDING_TYP_BY_ID,
+    TILESET6_BOMB_BLUEPRINTS,
+    TILESET6_BOMB_DIAGONAL_KEY_TYP_BY_OFFSET,
+    TYP_BEAM_GATE_NO_ROAD,
+    TYP_BEAM_GATE_WITH_ROAD,
+    TYP_BOMB_STANDARD,
     TYP_BORDER_BOTTOM,
     TYP_BORDER_BOTTOM_LEFT,
     TYP_BORDER_BOTTOM_RIGHT,
@@ -14,6 +22,9 @@ from ..constants import (
     TYP_BORDER_TOP,
     TYP_BORDER_TOP_LEFT,
     TYP_BORDER_TOP_RIGHT,
+    TYP_GATE_CLOSED_1,
+    TYP_GATE_CLOSED_2,
+    TYP_TILESET6_BOMB,
 )
 from ..ldf import parse_maps
 from ..models import MapRows
@@ -37,6 +48,8 @@ def validate_level(level: _Gen4Level, text: str | None = None) -> list[str]:
     problems.extend(_validate_enables(level))
     problems.extend(_validate_squads(level))
     problems.extend(route_blockers(level.maps.get("hgt", []), level.required_route_cells))
+    problems.extend(_validate_gates(level))
+    problems.extend(_validate_items(level))
     problems.extend(_validate_gems(level))
     problems.extend(_validate_infrastructure(level))
     problems.extend(_validate_functional_collisions(level))
@@ -143,6 +156,7 @@ def _validate_squads(level: _Gen4Level) -> list[str]:
 def _validate_gems(level: _Gen4Level) -> list[str]:
     problems: list[str] = []
     blg = level.maps.get("blg", [])
+    typ = level.maps.get("typ", [])
     for gem in level.gems:
         x = y = building = None
         for line in gem:
@@ -157,6 +171,60 @@ def _validate_gems(level: _Gen4Level) -> list[str]:
             continue
         if not (0 <= y < len(blg) and 0 <= x < len(blg[y])) or blg[y][x] != building:
             problems.append("upgrade gem building id not reflected in blg_map")
+        expected_typ = _tech_upgrade_typ(level, building)
+        if _tech_upgrade_tileset_invalid(level, building):
+            problems.append("upgrade gem building 60 is only valid in tileset 5")
+        elif expected_typ is not None and (not (0 <= y < len(typ) and 0 <= x < len(typ[y])) or typ[y][x] != expected_typ):
+            problems.append("upgrade gem typ_map value is incompatible with building id")
+    return problems
+
+
+def _validate_gates(level: _Gen4Level) -> list[str]:
+    problems: list[str] = []
+    typ = level.maps.get("typ", [])
+    blg = level.maps.get("blg", [])
+    for gate in level.gates:
+        x = int(gate.get("sec_x", -1))
+        y = int(gate.get("sec_y", -1))
+        expected_typ = _beam_gate_typ(gate)
+        if not (0 <= y < len(typ) and 0 <= x < len(typ[y])) or typ[y][x] != expected_typ:
+            problems.append("beam gate typ_map value is incompatible with closed/opened blueprints")
+        if 0 <= y < len(blg) and 0 <= x < len(blg[y]) and blg[y][x] != 0:
+            problems.append("beam gate blg_map cell must be empty")
+    return problems
+
+
+def _validate_items(level: _Gen4Level) -> list[str]:
+    problems: list[str] = []
+    typ = level.maps.get("typ", [])
+    blg = level.maps.get("blg", [])
+    for item in level.items:
+        x = int(item.get("sec_x", -1))
+        y = int(item.get("sec_y", -1))
+        expected_typ = _item_typ(item)
+        first_bp = _first_item_blueprint(item)
+        if expected_typ is not None and (not (0 <= y < len(typ) and 0 <= x < len(typ[y])) or typ[y][x] != expected_typ):
+            problems.append("bomb typ_map value is incompatible with item blueprints")
+        if first_bp is not None and (not (0 <= y < len(blg) and 0 <= x < len(blg[y])) or blg[y][x] != first_bp):
+            problems.append("bomb blueprint id not reflected in blg_map")
+        blueprints = _item_blueprints(item)
+        if blueprints == TILESET6_BOMB_BLUEPRINTS and int(getattr(level, "tileset", 0)) != 6:
+            problems.append("tileset 6 bomb blueprints used outside tileset 6")
+            continue
+        for key in item.get("keysecs", []):
+            key_x = int(key.get("x", -1))
+            key_y = int(key.get("y", -1))
+            if not (0 <= key_y < len(typ) and 0 <= key_x < len(typ[key_y])):
+                problems.append("bomb keysec coordinates out of bounds")
+                continue
+            expected_key_typ = _item_key_typ(level, item, key_x, key_y)
+            if isinstance(expected_key_typ, set):
+                if typ[key_y][key_x] not in expected_key_typ:
+                    problems.append("bomb keysec typ_map value is incompatible with item blueprints")
+            elif typ[key_y][key_x] != expected_key_typ:
+                problems.append("bomb keysec typ_map value is incompatible with item blueprints")
+            if 0 <= key_y < len(blg) and 0 <= key_x < len(blg[key_y]) and blg[key_y][key_x] != 0:
+                problems.append("bomb keysec blg_map cell must be empty")
     return problems
 
 
@@ -265,3 +333,62 @@ def _world_cell(pos_x: object, pos_z: object) -> tuple[int, int] | None:
 
 def _interior(level: _Gen4Level, x: int, y: int) -> bool:
     return 0 < x < level.width - 1 and 0 < y < level.height - 1
+
+
+def _beam_gate_typ(gate: dict[str, object]) -> int:
+    closed_bp = int(gate.get("closed_bp", 5))
+    opened_bp = int(gate.get("opened_bp", 6))
+    if (closed_bp, opened_bp) == (25, 26):
+        return TYP_BEAM_GATE_NO_ROAD
+    if (closed_bp, opened_bp) == (5, 6):
+        return TYP_BEAM_GATE_WITH_ROAD
+    return TYP_BEAM_GATE_WITH_ROAD
+
+
+def _item_typ(item: dict[str, object]) -> int | None:
+    blueprints = _item_blueprints(item)
+    if blueprints == STANDARD_BOMB_BLUEPRINTS:
+        return TYP_BOMB_STANDARD
+    if blueprints == TILESET6_BOMB_BLUEPRINTS:
+        return TYP_TILESET6_BOMB
+    first = _first_item_blueprint(item)
+    return BUILDING_TYP_BY_ID.get(first) if first is not None else None
+
+
+def _item_key_typ(level: _Gen4Level, item: dict[str, object], x: int, y: int) -> int | set[int]:
+    blueprints = _item_blueprints(item)
+    if blueprints == TILESET6_BOMB_BLUEPRINTS and int(getattr(level, "tileset", 0)) == 6:
+        offset = (x - int(item["sec_x"]), y - int(item["sec_y"]))
+        diagonal_typ = TILESET6_BOMB_DIAGONAL_KEY_TYP_BY_OFFSET.get(offset)
+        if diagonal_typ is not None:
+            return diagonal_typ
+    return {TYP_GATE_CLOSED_1, TYP_GATE_CLOSED_2}
+
+
+def _item_blueprints(item: dict[str, object]) -> tuple[int, int, int] | None:
+    values: list[int] = []
+    for key in ("inactive_bp", "active_bp", "trigger_bp"):
+        value = item.get(key)
+        if value is None:
+            return None
+        values.append(int(value))
+    return values[0], values[1], values[2]
+
+
+def _first_item_blueprint(item: dict[str, object]) -> int | None:
+    for key in ("inactive_bp", "active_bp", "trigger_bp"):
+        value = item.get(key)
+        if value is not None:
+            return int(value)
+    return None
+
+
+def _tech_upgrade_typ(level: _Gen4Level, building: int) -> int | None:
+    if _tech_upgrade_tileset_invalid(level, building):
+        return None
+    return TECH_UPGRADE_BUILDING_TYP_BY_ID.get(building)
+
+
+def _tech_upgrade_tileset_invalid(level: _Gen4Level, building: int) -> bool:
+    allowed_tilesets = TECH_UPGRADE_BUILDING_TILESETS.get(building)
+    return allowed_tilesets is not None and int(getattr(level, "tileset", 0)) not in allowed_tilesets

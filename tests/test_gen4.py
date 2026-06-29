@@ -10,7 +10,15 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 sys.path.insert(0, str(SRC))
 
-from ualg.constants import TYP_GATE_CLOSED_1, TYP_GATE_CLOSED_2
+from ualg.constants import (
+    TILESET6_BOMB_DIAGONAL_KEY_TYP_BY_OFFSET,
+    TYP_BEAM_GATE_NO_ROAD,
+    TYP_BEAM_GATE_WITH_ROAD,
+    TYP_BOMB_STANDARD,
+    TYP_GATE_CLOSED_1,
+    TYP_GATE_CLOSED_2,
+    TYP_TILESET6_BOMB,
+)
 from ualg.data import gen4_rules
 from ualg.gen3.ldf_reader import parse_ldf
 from ualg.gen4.builder import Generator4Builder
@@ -335,8 +343,133 @@ class MapOverrideTests(unittest.TestCase):
 
         Generator4Builder()._apply_gate_tiles(level, typ, blg)
 
-        self.assertEqual(typ[2][2], TYP_GATE_CLOSED_1)
+        self.assertEqual(typ[2][2], TYP_BEAM_GATE_WITH_ROAD)
         self.assertEqual(typ[1][1], 0)
+
+    def test_beam_gate_blueprints_choose_matching_typ_map_cells(self) -> None:
+        level = SimpleNamespace(
+            gates=[
+                {"sec_x": 1, "sec_y": 1, "closed_bp": 25, "opened_bp": 26, "keysecs": []},
+                {"sec_x": 2, "sec_y": 2, "closed_bp": 5, "opened_bp": 6, "keysecs": []},
+            ]
+        )
+        typ = [[0 for _ in range(4)] for _ in range(4)]
+        blg = [[0 for _ in range(4)] for _ in range(4)]
+
+        Generator4Builder()._apply_gate_tiles(level, typ, blg)
+
+        self.assertEqual(typ[1][1], TYP_BEAM_GATE_NO_ROAD)
+        self.assertEqual(typ[2][2], TYP_BEAM_GATE_WITH_ROAD)
+
+    def test_standard_bomb_blueprints_use_245(self) -> None:
+        level = SimpleNamespace(
+            source="vanilla",
+            items=[
+                {
+                    "sec_x": 2,
+                    "sec_y": 2,
+                    "inactive_bp": 35,
+                    "active_bp": 36,
+                    "trigger_bp": 37,
+                    "keysecs": [],
+                }
+            ]
+        )
+        typ = [[0 for _ in range(4)] for _ in range(4)]
+        blg = [[0 for _ in range(4)] for _ in range(4)]
+
+        Generator4Builder()._apply_item_tiles(level, typ, blg)
+
+        self.assertEqual(typ[2][2], TYP_BOMB_STANDARD)
+        self.assertEqual(blg[2][2], 35)
+
+    def test_tileset6_bomb_blueprints_use_235_and_diagonal_keysec_tiles(self) -> None:
+        level = SimpleNamespace(
+            source="vanilla",
+            tileset=6,
+            width=7,
+            height=7,
+            items=[
+                {
+                    "sec_x": 3,
+                    "sec_y": 3,
+                    "inactive_bp": 68,
+                    "active_bp": 69,
+                    "trigger_bp": 70,
+                    "keysecs": [
+                        {"x": 2, "y": 2},
+                        {"x": 4, "y": 2},
+                        {"x": 2, "y": 4},
+                        {"x": 4, "y": 4},
+                        {"x": 5, "y": 5},
+                    ],
+                }
+            ],
+        )
+        typ = [[0 for _ in range(7)] for _ in range(7)]
+        blg = [[0 for _ in range(7)] for _ in range(7)]
+
+        Generator4Builder()._apply_item_tiles(level, typ, blg)
+
+        self.assertEqual(typ[3][3], TYP_TILESET6_BOMB)
+        self.assertEqual(blg[3][3], 68)
+        for (dx, dy), expected in TILESET6_BOMB_DIAGONAL_KEY_TYP_BY_OFFSET.items():
+            self.assertEqual(typ[3 + dy][3 + dx], expected)
+            self.assertEqual(blg[3 + dy][3 + dx], 0)
+        self.assertEqual(typ[5][5], TYP_GATE_CLOSED_2)
+
+    def test_tileset6_bomb_without_diagonal_keysecs_does_not_stamp_corner_tiles(self) -> None:
+        level = SimpleNamespace(
+            source="vanilla",
+            tileset=6,
+            width=7,
+            height=7,
+            items=[
+                {
+                    "sec_x": 3,
+                    "sec_y": 3,
+                    "inactive_bp": 68,
+                    "active_bp": 69,
+                    "trigger_bp": 70,
+                    "keysecs": [],
+                }
+            ],
+        )
+        typ = [[0 for _ in range(7)] for _ in range(7)]
+        blg = [[0 for _ in range(7)] for _ in range(7)]
+
+        Generator4Builder()._apply_item_tiles(level, typ, blg)
+
+        self.assertEqual(typ[3][3], TYP_TILESET6_BOMB)
+        for dx, dy in TILESET6_BOMB_DIAGONAL_KEY_TYP_BY_OFFSET:
+            self.assertEqual(typ[3 + dy][3 + dx], 0)
+
+    def test_upgrade_gem_building_ids_choose_matching_typ_map_cells(self) -> None:
+        expected = {
+            60: 106,
+            61: 113,
+            4: 100,
+            7: 73,
+            15: 104,
+            51: 101,
+            50: 102,
+            16: 103,
+            65: 110,
+        }
+
+        for building, typ_value in expected.items():
+            with self.subTest(building=building):
+                level = SimpleNamespace(
+                    tileset=5,
+                    gems=[["begin_gem", "sec_x = 2", "sec_y = 2", f"building = {building}", "end"]],
+                )
+                typ = [[0 for _ in range(4)] for _ in range(4)]
+                blg = [[0 for _ in range(4)] for _ in range(4)]
+
+                Generator4Builder()._apply_gem_tiles(level, typ, blg)
+
+                self.assertEqual(typ[2][2], typ_value)
+                self.assertEqual(blg[2][2], building)
 
     def test_bomb_keysecs_without_four_road_edges_use_243(self) -> None:
         level = SimpleNamespace(

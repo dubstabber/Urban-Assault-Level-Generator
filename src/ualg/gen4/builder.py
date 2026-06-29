@@ -13,8 +13,17 @@ from ..constants import (
     ENABLE_EXCLUDED_VEHICLE_IDS,
     MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS,
     SKY_OPTIONS,
+    STANDARD_BOMB_BLUEPRINTS,
+    TECH_UPGRADE_BUILDING_TILESETS,
+    TECH_UPGRADE_BUILDING_TYP_BY_ID,
+    TILESET6_BOMB_BLUEPRINTS,
+    TILESET6_BOMB_DIAGONAL_KEY_TYP_BY_OFFSET,
+    TYP_BEAM_GATE_NO_ROAD,
+    TYP_BEAM_GATE_WITH_ROAD,
+    TYP_BOMB_STANDARD,
     TYP_GATE_CLOSED_1,
     TYP_GATE_CLOSED_2,
+    TYP_TILESET6_BOMB,
     sector_to_world_x,
     sector_to_world_z,
 )
@@ -235,14 +244,20 @@ class Generator4Builder:
         items: list[dict[str, Any]] = []
         for source_item in level.archetype.record.get("items", []):
             source_cell = (int(source_item.get("sec_x", 1)), int(source_item.get("sec_y", 1)))
-            cell = self._jitter_cell(level, source_cell, occupied, radius=3)
+            cell = self._jitter_item_cell(level, source_item, source_cell, occupied, radius=3)
             occupied.add(cell)
             item = dict(source_item)
             item["sec_x"], item["sec_y"] = cell
             item["keysecs"] = []
+            reserved_key_cells = self._tileset6_bomb_diagonal_key_cells(level, source_item, source_cell, cell)
+            occupied.update(reserved_key_cells)
             for key in source_item.get("keysecs", []):
-                key_cell = self._jitter_cell(level, (int(key["x"]), int(key["y"])), occupied, radius=3)
-                occupied.add(key_cell)
+                offset = self._tileset6_bomb_diagonal_key_offset(level, source_item, source_cell, key)
+                if offset is None:
+                    key_cell = self._jitter_cell(level, (int(key["x"]), int(key["y"])), occupied, radius=3)
+                    occupied.add(key_cell)
+                else:
+                    key_cell = (cell[0] + offset[0], cell[1] + offset[1])
                 item["keysecs"].append({"x": key_cell[0], "y": key_cell[1]})
             items.append(item)
         return items
@@ -406,20 +421,50 @@ class Generator4Builder:
 
     def _apply_gate_tiles(self, level: _Gen4Level, typ: MapRows, blg: MapRows) -> None:
         for gate in level.gates:
-            typ[gate["sec_y"]][gate["sec_x"]] = TYP_GATE_CLOSED_1
+            typ[gate["sec_y"]][gate["sec_x"]] = self._beam_gate_typ(gate)
             blg[gate["sec_y"]][gate["sec_x"]] = 0
+
+    @staticmethod
+    def _beam_gate_typ(gate: dict[str, Any]) -> int:
+        closed_bp = int(gate.get("closed_bp", 5))
+        opened_bp = int(gate.get("opened_bp", 6))
+        if (closed_bp, opened_bp) == (25, 26):
+            return TYP_BEAM_GATE_NO_ROAD
+        if (closed_bp, opened_bp) == (5, 6):
+            return TYP_BEAM_GATE_WITH_ROAD
+        return TYP_BEAM_GATE_WITH_ROAD
 
     def _apply_item_tiles(self, level: _Gen4Level, typ: MapRows, blg: MapRows) -> None:
         for item in level.items:
+            x = int(item["sec_x"])
+            y = int(item["sec_y"])
             for key in ("inactive_bp", "active_bp", "trigger_bp"):
                 if item.get(key) is not None:
-                    blg[item["sec_y"]][item["sec_x"]] = int(item[key])
+                    blg[y][x] = int(item[key])
                     break
+            typ[y][x] = self._item_typ(item, typ[y][x])
             for key in item.get("keysecs", []):
-                typ[key["y"]][key["x"]] = self._bomb_key_typ(level, typ, int(key["x"]), int(key["y"]))
-                blg[key["y"]][key["x"]] = 0
+                key_x = int(key["x"])
+                key_y = int(key["y"])
+                typ[key_y][key_x] = self._bomb_key_typ(level, item, typ, key_x, key_y)
+                blg[key_y][key_x] = 0
 
-    def _bomb_key_typ(self, level: _Gen4Level, typ: MapRows, x: int, y: int) -> int:
+    @staticmethod
+    def _item_typ(item: dict[str, Any], fallback: int) -> int:
+        blueprints = _item_blueprints(item)
+        if blueprints == STANDARD_BOMB_BLUEPRINTS:
+            return TYP_BOMB_STANDARD
+        if blueprints == TILESET6_BOMB_BLUEPRINTS:
+            return TYP_TILESET6_BOMB
+        first = _first_item_blueprint(item)
+        return BUILDING_TYP_BY_ID.get(first, fallback) if first is not None else fallback
+
+    def _bomb_key_typ(self, level: _Gen4Level, item: dict[str, Any], typ: MapRows, x: int, y: int) -> int:
+        if _item_blueprints(item) == TILESET6_BOMB_BLUEPRINTS and int(getattr(level, "tileset", 0)) == 6:
+            offset = (x - int(item["sec_x"]), y - int(item["sec_y"]))
+            diagonal_typ = TILESET6_BOMB_DIAGONAL_KEY_TYP_BY_OFFSET.get(offset)
+            if diagonal_typ is not None:
+                return diagonal_typ
         if self._bomb_key_has_four_road_edges(str(getattr(level, "source", "")), typ, x, y):
             return TYP_GATE_CLOSED_1
         return TYP_GATE_CLOSED_2
@@ -452,7 +497,14 @@ class Generator4Builder:
             if x is None or y is None or building is None:
                 continue
             blg[y][x] = building
-            typ[y][x] = BUILDING_TYP_BY_ID.get(building, typ[y][x])
+            typ[y][x] = self._tech_upgrade_typ(level, building, typ[y][x])
+
+    @staticmethod
+    def _tech_upgrade_typ(level: _Gen4Level, building: int, fallback: int) -> int:
+        allowed_tilesets = TECH_UPGRADE_BUILDING_TILESETS.get(building)
+        if allowed_tilesets is not None and int(getattr(level, "tileset", 0)) not in allowed_tilesets:
+            return fallback
+        return TECH_UPGRADE_BUILDING_TYP_BY_ID.get(building, BUILDING_TYP_BY_ID.get(building, fallback))
 
     # -- metadata -------------------------------------------------------------
 
@@ -617,6 +669,58 @@ class Generator4Builder:
             return best
         return self._fallback_cell(level, occupied)
 
+    def _jitter_item_cell(
+        self,
+        level: _Gen4Level,
+        item: dict[str, Any],
+        source_cell: tuple[int, int],
+        occupied: set[tuple[int, int]],
+        *,
+        radius: int,
+    ) -> tuple[int, int]:
+        sx = max(1, min(level.width - 2, int(source_cell[0])))
+        sy = max(1, min(level.height - 2, int(source_cell[1])))
+        best = (sx, sy)
+        for _ in range(48):
+            x = max(1, min(level.width - 2, sx + level.rng.rand_range(-radius, radius)))
+            y = max(1, min(level.height - 2, sy + level.rng.rand_range(-radius, radius)))
+            cell = (x, y)
+            if self._item_cell_available(level, item, cell, occupied):
+                return cell
+            best = cell
+        if self._item_cell_available(level, item, best, occupied):
+            return best
+        return self._fallback_item_cell(level, item, occupied)
+
+    def _fallback_item_cell(
+        self,
+        level: _Gen4Level,
+        item: dict[str, Any],
+        occupied: set[tuple[int, int]],
+    ) -> tuple[int, int]:
+        for y in range(1, level.height - 1):
+            for x in range(1, level.width - 1):
+                cell = (x, y)
+                if self._item_cell_available(level, item, cell, occupied):
+                    return cell
+        return self._fallback_cell(level, occupied)
+
+    def _item_cell_available(
+        self,
+        level: _Gen4Level,
+        item: dict[str, Any],
+        cell: tuple[int, int],
+        occupied: set[tuple[int, int]],
+    ) -> bool:
+        if cell in occupied:
+            return False
+        if _item_blueprints(item) != TILESET6_BOMB_BLUEPRINTS or int(getattr(level, "tileset", 0)) != 6:
+            return True
+        source_cell = (int(item.get("sec_x", cell[0])), int(item.get("sec_y", cell[1])))
+        key_cells = self._tileset6_bomb_diagonal_key_cells(level, item, source_cell, cell)
+        expected = len(self._tileset6_bomb_diagonal_key_offsets(level, item, source_cell))
+        return len(key_cells) == expected and not any(key_cell in occupied for key_cell in key_cells)
+
     def _fallback_cell(self, level: _Gen4Level, occupied: set[tuple[int, int]]) -> tuple[int, int]:
         for _ in range(128):
             cell = (level.rng.rand_range(1, level.width - 2), level.rng.rand_range(1, level.height - 2))
@@ -635,6 +739,53 @@ class Generator4Builder:
         x = max(1, int(round((int(entity["pos_x"]) - 1) / 1200 - 0.5)))
         y = max(1, int(round((-(int(entity["pos_z"]) - 1)) / 1200 - 0.5)))
         return x, y
+
+    def _tileset6_bomb_diagonal_key_cells(
+        self,
+        level: _Gen4Level,
+        item: dict[str, Any],
+        source_cell: tuple[int, int],
+        generated_cell: tuple[int, int],
+    ) -> list[tuple[int, int]]:
+        cells: list[tuple[int, int]] = []
+        gx, gy = generated_cell
+        for dx, dy in self._tileset6_bomb_diagonal_key_offsets(level, item, source_cell):
+            x = gx + dx
+            y = gy + dy
+            if 0 < x < level.width - 1 and 0 < y < level.height - 1:
+                cells.append((x, y))
+        return cells
+
+    @staticmethod
+    def _tileset6_bomb_diagonal_key_offsets(
+        level: _Gen4Level,
+        item: dict[str, Any],
+        source_cell: tuple[int, int],
+    ) -> list[tuple[int, int]]:
+        if _item_blueprints(item) != TILESET6_BOMB_BLUEPRINTS or int(getattr(level, "tileset", 0)) != 6:
+            return []
+        sx, sy = source_cell
+        offsets: list[tuple[int, int]] = []
+        for key in item.get("keysecs", []):
+            offset = (int(key["x"]) - sx, int(key["y"]) - sy)
+            if offset in TILESET6_BOMB_DIAGONAL_KEY_TYP_BY_OFFSET:
+                offsets.append(offset)
+        return offsets
+
+    def _tileset6_bomb_diagonal_key_offset(
+        self,
+        level: _Gen4Level,
+        item: dict[str, Any],
+        source_cell: tuple[int, int],
+        key: dict[str, Any],
+    ) -> tuple[int, int] | None:
+        if _item_blueprints(item) != TILESET6_BOMB_BLUEPRINTS or int(getattr(level, "tileset", 0)) != 6:
+            return None
+        sx, sy = source_cell
+        offset = (int(key["x"]) - sx, int(key["y"]) - sy)
+        if offset in TILESET6_BOMB_DIAGONAL_KEY_TYP_BY_OFFSET:
+            return offset
+        return None
 
 
 @lru_cache(maxsize=None)
@@ -659,3 +810,21 @@ def _bomb_key_road_edge_tiles(source: str) -> dict[str, frozenset[int]]:
                 edges["south"].add(int(typ[y + 1][x]))
                 edges["west"].add(int(typ[y][x - 1]))
     return {key: frozenset(values) for key, values in edges.items()}
+
+
+def _item_blueprints(item: dict[str, Any]) -> tuple[int, int, int] | None:
+    values: list[int] = []
+    for key in ("inactive_bp", "active_bp", "trigger_bp"):
+        value = item.get(key)
+        if value is None:
+            return None
+        values.append(int(value))
+    return values[0], values[1], values[2]
+
+
+def _first_item_blueprint(item: dict[str, Any]) -> int | None:
+    for key in ("inactive_bp", "active_bp", "trigger_bp"):
+        value = item.get(key)
+        if value is not None:
+            return int(value)
+    return None
