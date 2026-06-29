@@ -10,8 +10,10 @@ sys.path.insert(0, str(SRC))
 
 from ualg.gen3.corpus import skeleton_by_name, skeletons_for_source
 from ualg.gen3.ldf_reader import parse_ldf
+from ualg.gen3.synthesis import adjacency_model_for, border_tile, synthesize_typ_map
 from ualg.generator3 import Generator3
 from ualg.ldf import parse_maps
+from ualg.rng import MSVCRTRandom
 
 _SAMPLE_LDF = """begin_level
 \tset\t=\t1
@@ -226,6 +228,66 @@ class RemixTests(unittest.TestCase):
     def test_unknown_profile_rejected(self) -> None:
         with self.assertRaises(ValueError):
             self.generator.generate_single(seed=1, campaign_profile="nope")
+
+
+class SynthesisTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.generator = Generator3()
+
+    def test_wfc_border_intact_and_adjacencies_valid(self) -> None:
+        width, height = 14, 12
+        rows, method = synthesize_typ_map("vanilla", 1, width, height, MSVCRTRandom(4242))
+        self.assertEqual(method, "wfc")
+        model = adjacency_model_for("vanilla", 1)
+        for y in range(height):
+            for x in range(width):
+                expected = border_tile(x, y, width, height)
+                if expected is not None:
+                    self.assertEqual(rows[y][x], expected)
+        for y in range(height):
+            for x in range(width):
+                if x + 1 < width:
+                    self.assertIn(rows[y][x + 1], model.right.get(rows[y][x], set()))
+                if y + 1 < height:
+                    self.assertIn(rows[y + 1][x], model.down.get(rows[y][x], set()))
+
+    def test_synthesize_typ_map_deterministic(self) -> None:
+        a, _ = synthesize_typ_map("vanilla", 1, 14, 12, MSVCRTRandom(7))
+        b, _ = synthesize_typ_map("vanilla", 1, 14, 12, MSVCRTRandom(7))
+        self.assertEqual(a, b)
+
+    def test_synthesis_single_is_deterministic_and_valid(self) -> None:
+        a = self.generator.generate_single(seed=2026, campaign_profile="original", mode="synthesis")
+        b = self.generator.generate_single(seed=2026, campaign_profile="original", mode="synthesis")
+        self.assertEqual(a.text, b.text)
+        self.assertEqual(a.metadata["mode"], "synthesis")
+        self.assertEqual(a.metadata["warnings"], [])
+        self.assertIn(a.metadata["synth_method"], ("wfc", "scanline"))
+
+    def test_synthesis_has_player_and_enemy_hosts(self) -> None:
+        level = self.generator.generate_single(seed=3, campaign_profile="original", mode="synthesis")
+        joined = level.text.replace("\r\n", "\n")
+        self.assertGreaterEqual(joined.count("begin_robo"), 2)
+        self.assertIn("owner\t=\t1", joined)  # player faction host present
+
+    def test_synthesis_maps_well_formed(self) -> None:
+        level = self.generator.generate_single(seed=9, campaign_profile="original", mode="synthesis")
+        parsed = parse_maps(level.text)
+        self.assertEqual(set(parsed), {"typ_map", "own_map", "hgt_map", "blg_map"})
+        typ = parsed["typ_map"][2]
+        self.assertEqual(typ[0][0], 0xF8)
+        self.assertEqual(typ[-1][-1], 0xFA)
+
+    def test_synthesis_campaign_valid(self) -> None:
+        campaign = self.generator.generate_campaign(seed=5, campaign_profile="md-ghorkov", mode="synthesis")
+        self.assertTrue(campaign.ok)
+        self.assertTrue(campaign.levels)
+        for level in campaign.levels:
+            self.assertEqual(level.metadata["warnings"], [])
+
+    def test_unknown_mode_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            self.generator.generate_single(seed=1, mode="nonsense")
 
 
 if __name__ == "__main__":

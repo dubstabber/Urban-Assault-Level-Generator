@@ -7,9 +7,14 @@ seeded faction remap.
 
 from __future__ import annotations
 
+from typing import Any
+
 from ..campaign_profiles import ProfileRoster
+from ..constants import BLACK_SECT_ENABLE_EXCLUDED_BUILDING_IDS
 from ..models import MapRows
 from ..rng import MSVCRTRandom
+
+_FACTION_BLACK_SECT = 5
 
 
 def build_faction_remap(
@@ -79,3 +84,23 @@ def choose_squad_vehicle(rng: MSVCRTRandom, roster: ProfileRoster, faction: int,
     if not vehicles:
         return fallback
     return rng.choice(vehicles)
+
+
+def build_enables(roster: ProfileRoster, factions: list[int]) -> list[dict[str, Any]]:
+    """Build begin_enable blocks for the present factions, in faction order."""
+
+    enables: list[dict[str, Any]] = []
+    for faction in sorted(set(factions)):
+        if not isinstance(faction, int) or not roster.vehicles_by_faction.get(faction):
+            continue
+        buildings = list(roster.buildings_by_faction.get(faction, ()))
+        if faction == _FACTION_BLACK_SECT:
+            buildings = [b for b in buildings if b not in BLACK_SECT_ENABLE_EXCLUDED_BUILDING_IDS]
+        enables.append(
+            {
+                "owner": faction,
+                "vehicles": list(roster.vehicles_by_faction.get(faction, ())),
+                "buildings": buildings,
+            }
+        )
+    return enables

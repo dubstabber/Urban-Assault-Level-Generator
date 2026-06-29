@@ -1,4 +1,4 @@
-"""Mutable Generator3 level context."""
+"""Mutable Generator3 level context (shared by Remix and Synthesis modes)."""
 
 from __future__ import annotations
 
@@ -18,12 +18,19 @@ class _Gen3Level:
     seed: int
     profile_id: str
     profile: CampaignProfile
-    skeleton: Skeleton
     player_faction: int
     zero_enemy_radar_budgets: bool = False
     zero_enemy_station_delays: bool = False
 
-    # Filled by the remix builder.
+    # Provenance (Remix populates skeleton; Synthesis populates synth_method).
+    mode: str = "remix"
+    skeleton: Skeleton | None = None
+    skeleton_name: str = ""
+    source: str = ""
+    synth_method: str = ""
+    title: str = ""
+
+    # Filled by the builder.
     faction_remap: dict[int, int] = field(default_factory=dict)
     tileset: int = 1
     width: int = 0
@@ -31,6 +38,8 @@ class _Gen3Level:
     sky: str = ""
     mission_briefing_map: str = ""
     mission_debriefing_map: str = ""
+    mbmap_block: dict[str, Any] = field(default_factory=dict)
+    dbmap_block: dict[str, Any] = field(default_factory=dict)
     header: dict[str, Any] = field(default_factory=dict)
     maps: dict[str, MapRows] = field(default_factory=dict)
     gates: list[dict[str, Any]] = field(default_factory=list)

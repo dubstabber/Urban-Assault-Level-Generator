@@ -4,18 +4,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..constants import BLACK_SECT_ENABLE_EXCLUDED_BUILDING_IDS, SKY_OPTIONS
+from ..constants import SKY_OPTIONS
 from ..startup_scripts import startup_include_for_level
 from .context import _Gen3Level
 from .placement import (
     build_building_remap,
+    build_enables,
     build_faction_remap,
     choose_squad_vehicle,
     relabel_own_map,
     remap_blg_map,
 )
-
-_FACTION_BLACK_SECT = 5
 
 # Robo AI keys, emitted in this order after the positional/identity keys.
 _BUDGET_KEYS = (
@@ -35,6 +34,12 @@ class Generator3RemixBuilder:
         skeleton = level.skeleton
         rng = level.rng
 
+        level.mode = "remix"
+        level.skeleton_name = skeleton.name
+        level.source = skeleton.source
+        level.title = str(skeleton.record["header"].get("title_default", skeleton.name))
+        level.mbmap_block = dict(skeleton.record.get("mbmap", {}))
+        level.dbmap_block = dict(skeleton.record.get("dbmap", {}))
         level.tileset = skeleton.tileset
         level.width = skeleton.width
         level.height = skeleton.height
@@ -131,28 +136,8 @@ class Generator3RemixBuilder:
         return copied
 
     def _build_enables(self, level: _Gen3Level) -> list[dict[str, Any]]:
-        roster = level.profile.roster
-        present = {level.player_faction}
-        present.update(level.faction_remap.values())
-        factions = [
-            faction
-            for faction in sorted(present)
-            if isinstance(faction, int) and roster.vehicles_by_faction.get(faction)
-        ]
-
-        enables: list[dict[str, Any]] = []
-        for faction in factions:
-            buildings = list(roster.buildings_by_faction.get(faction, ()))
-            if faction == _FACTION_BLACK_SECT:
-                buildings = [b for b in buildings if b not in BLACK_SECT_ENABLE_EXCLUDED_BUILDING_IDS]
-            enables.append(
-                {
-                    "owner": faction,
-                    "vehicles": list(roster.vehicles_by_faction.get(faction, ())),
-                    "buildings": buildings,
-                }
-            )
-        return enables
+        present = [level.player_faction, *level.faction_remap.values()]
+        return build_enables(level.profile.roster, present)
 
     def _remix_prototype(self, level: _Gen3Level) -> list[str]:
         include_line = startup_include_for_level(level.profile_id, level.level_id)

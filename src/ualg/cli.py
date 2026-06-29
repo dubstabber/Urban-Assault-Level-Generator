@@ -95,8 +95,13 @@ def build_parser() -> argparse.ArgumentParser:
         default="original",
         help="Generator3 roster/profile to remix with",
     )
-    gen3_single.add_argument("--skeleton", default=None, help="Force a source level, e.g. L1515")
-    gen3_single.add_argument("--level-id", type=int, default=None, help="Use the original level with this id as skeleton")
+    gen3_single.add_argument(
+        "--synthesis",
+        action="store_true",
+        help="Synthesize new WFC terrain instead of remixing an authored level",
+    )
+    gen3_single.add_argument("--skeleton", default=None, help="Remix: force a source level, e.g. L1515")
+    gen3_single.add_argument("--level-id", type=int, default=None, help="Remix: use the original level with this id as skeleton")
     gen3_single.add_argument(
         "--zero-enemy-radar-budgets",
         action="store_true",
@@ -115,6 +120,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=GENERATOR3_CAMPAIGN_PROFILES,
         default="original",
         help="Generator3 roster/profile to remix with",
+    )
+    gen3_campaign.add_argument(
+        "--synthesis",
+        action="store_true",
+        help="Synthesize new WFC terrain instead of remixing authored levels",
     )
     gen3_campaign.add_argument(
         "--zero-enemy-radar-budgets",
@@ -181,26 +191,30 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     generator = Generator3()
+    gen3_mode = "synthesis" if args.synthesis else "remix"
     if args.mode == "single":
         level = generator.generate_single(
             seed=args.seed,
             campaign_profile=args.campaign_profile,
+            mode=gen3_mode,
             skeleton=args.skeleton,
             level_id=args.level_id,
             zero_enemy_radar_budgets=args.zero_enemy_radar_budgets,
             zero_enemy_station_delays=args.zero_enemy_station_delays,
         )
         path = level.write(args.output)
-        print(f"Wrote {path} (remix of {level.metadata['skeleton']})")
+        origin = level.metadata.get("skeleton") or f"synthesized/{level.metadata.get('synth_method')}"
+        print(f"Wrote {path} ({gen3_mode}: {origin})")
         return 0
     campaign = generator.generate_campaign(
         seed=args.seed,
         campaign_profile=args.campaign_profile,
+        mode=gen3_mode,
         zero_enemy_radar_budgets=args.zero_enemy_radar_budgets,
         zero_enemy_station_delays=args.zero_enemy_station_delays,
     )
     written = campaign.write(args.output_dir)
-    print(f"Wrote {len(written)} Generator3 levels to {Path(args.output_dir)}")
+    print(f"Wrote {len(written)} Generator3 levels ({gen3_mode}) to {Path(args.output_dir)}")
     return 0
 
 

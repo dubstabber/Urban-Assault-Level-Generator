@@ -122,21 +122,24 @@ Built-in profile sizes:
 
 ## Generator3 Single Level
 
-Remix one hand-made original level: its terrain, entity positions and balance
-numbers are reused, while faction identities, rosters and sky are regenerated
-from the chosen profile.
+In the default **Remix** mode, reuse one hand-made original level: its terrain,
+entity positions and balance numbers are kept, while faction identities, rosters
+and sky are regenerated from the chosen profile. Pass `--synthesis` to instead
+generate brand-new Wave Function Collapse terrain and place fresh entities on it.
 
 ```sh
 ualg gen3 single --seed 12345 --campaign-profile original --output out/L0101.ldf
 ualg gen3 single --seed 12345 --skeleton L1515 --output out/remix.ldf
+ualg gen3 single --seed 12345 --synthesis --output out/synth.ldf
 ```
 
 | Option | Required | Default | Description |
 | --- | --- | --- | --- |
 | `--seed SEED` | No | `0` | Integer RNG seed. `0` uses the current time. |
-| `--campaign-profile {original,md-ghorkov,md-taerkasten}` | No | `original` | Roster/profile used for the remix. `original` draws from the vanilla corpus; the `md-*` profiles draw from Metropolis Dawn. |
-| `--skeleton NAME` | No | None | Force a specific source level, e.g. `L1515`. When omitted, a skeleton is chosen from the seed. |
-| `--level-id ID` | No | None | Use the original level with this id (e.g. `15` → `L1515`) as the skeleton. |
+| `--campaign-profile {original,md-ghorkov,md-taerkasten}` | No | `original` | Roster/profile used. `original` draws from the vanilla corpus; the `md-*` profiles draw from Metropolis Dawn. |
+| `--synthesis` | No | Off | Synthesize new WFC terrain instead of remixing an authored level. |
+| `--skeleton NAME` | No | None | Remix only: force a specific source level, e.g. `L1515`. When omitted, a skeleton is chosen from the seed. |
+| `--level-id ID` | No | None | Remix only: use the original level with this id (e.g. `15` → `L1515`) as the skeleton. |
 | `--zero-enemy-radar-budgets` | No | Off | Set all enemy host station `rad_budget` values to `0`. |
 | `--zero-enemy-station-delays` | No | Off | Set all enemy host station `*_delay` values to `0`. |
 | `--output OUTPUT` | Yes | None | Output `.ldf` file path. Parent directories are created automatically. |
@@ -153,7 +156,8 @@ ualg gen3 campaign --seed 12345 --campaign-profile original --output-dir out/gen
 | Option | Required | Default | Description |
 | --- | --- | --- | --- |
 | `--seed SEED` | No | `0` | Integer RNG seed. `0` uses the current time. |
-| `--campaign-profile {original,md-ghorkov,md-taerkasten}` | No | `original` | Roster/profile used for the remix. |
+| `--campaign-profile {original,md-ghorkov,md-taerkasten}` | No | `original` | Roster/profile used. |
+| `--synthesis` | No | Off | Synthesize new WFC terrain for every level instead of remixing authored levels. |
 | `--zero-enemy-radar-budgets` | No | Off | Set all enemy host station `rad_budget` values to `0`. |
 | `--zero-enemy-station-delays` | No | Off | Set all enemy host station `*_delay` values to `0`. |
 | `--output-dir OUTPUT_DIR` | Yes | None | Directory where campaign `.ldf` files are written. The directory is created automatically. |
@@ -162,9 +166,9 @@ Built-in profile sizes:
 
 | Profile | Output |
 | --- | --- |
-| `original` | 44-level vanilla campaign remix. |
-| `md-ghorkov` | 16-level Metropolis Dawn Ghorkov campaign remix. |
-| `md-taerkasten` | 15-level Metropolis Dawn Taerkasten campaign remix. |
+| `original` | 44-level vanilla campaign. |
+| `md-ghorkov` | 16-level Metropolis Dawn Ghorkov campaign. |
+| `md-taerkasten` | 15-level Metropolis Dawn Taerkasten campaign. |
 
 ## GUI Command
 

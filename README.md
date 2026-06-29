@@ -6,7 +6,7 @@ Implemented targets:
 
 - `generator1`: Random UA-derived terrain and campaign generator, defaulting to the improved recovered behavior.
 - `generator2`: PHP-derived.
-- `generator3`: Corpus-driven, authored-style generator (Remix mode). Instead of scattering terrain procedurally, it reuses a hand-made original level as a skeleton — its terrain maps, entity positions and balance numbers — and regenerates only the faction identities, rosters, sky and campaign wiring per seed.
+- `generator3`: Corpus-driven, authored-style generator with two modes. **Remix** reuses a hand-made original level as a skeleton — its terrain maps, entity positions and balance numbers — and regenerates only the faction identities, rosters, sky and campaign wiring per seed. **Synthesis** (`--synthesis`) instead learns tile-adjacency from the corpus and uses Wave Function Collapse to generate brand-new coherent terrain (connected streets, plausible blocks), then places fresh entities on it.
 
 Compatibility policy:
 
@@ -29,6 +29,7 @@ python -m ualg.cli gen1 campaign --seed 12345 --output-dir out/gen1
 python -m ualg.cli gen2 single --seed 12345 --level-id 1 --output out/L0101.ldf
 python -m ualg.cli gen2 campaign --seed 12345 --output-dir out/gen2
 python -m ualg.cli gen3 single --seed 12345 --skeleton L1515 --output out/remix.ldf
+python -m ualg.cli gen3 single --seed 12345 --synthesis --output out/synth.ldf
 python -m ualg.cli gen3 campaign --seed 12345 --output-dir out/gen3
 ```
 
