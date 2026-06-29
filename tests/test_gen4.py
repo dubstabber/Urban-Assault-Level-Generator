@@ -4,27 +4,65 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 sys.path.insert(0, str(SRC))
 
+from ualg.constants import TYP_GATE_CLOSED_1, TYP_GATE_CLOSED_2
 from ualg.data import gen4_rules
 from ualg.gen3.ldf_reader import parse_ldf
+from ualg.gen4.builder import Generator4Builder
+from ualg.gen4.infrastructure import station_info_by_building
 from ualg.gen4.passability import route_blockers
 from ualg.gen4.rules_builder import build_rules
 from ualg.generator4 import Generator4
 from ualg.ldf import parse_maps
+
+_SCOUT_VEHICLES = {9, 29, 35, 67, 74}
+
+
+def _world_cell(entity: dict[str, object]) -> tuple[int, int]:
+    return (
+        round((int(entity["pos_x"]) - 1) / 1200 - 0.5),
+        round((-(int(entity["pos_z"]) - 1)) / 1200 - 0.5),
+    )
+
+
+def _station_cells(level) -> list[tuple[int, int, str, int]]:
+    info = station_info_by_building()
+    cells: list[tuple[int, int, str, int]] = []
+    for y, row in enumerate(level.maps["blg"]):
+        for x, building in enumerate(row):
+            station = info.get(int(building))
+            if station is not None:
+                cells.append((x, y, station.category, int(level.maps["own"][y][x])))
+    return cells
+
+
+def _min_chebyshev_distance(cells: list[tuple[int, int]]) -> int | None:
+    if len(cells) < 2:
+        return None
+    return min(
+        max(abs(ax - bx), abs(ay - by))
+        for index, (ax, ay) in enumerate(cells)
+        for bx, by in cells[index + 1 :]
+    )
 
 
 class RulesTests(unittest.TestCase):
     def test_baked_rules_available(self) -> None:
         rules = gen4_rules()
 
-        self.assertEqual(rules["version"], 1)
+        self.assertEqual(rules["version"], 2)
         self.assertEqual(len(rules["profiles"]["original"]["levels"]), 44)
         self.assertEqual(len(rules["profiles"]["md-ghorkov"]["levels"]), 16)
         self.assertEqual(len(rules["profiles"]["md-taerkasten"]["levels"]), 15)
+        record = next(r for r in rules["profiles"]["original"]["levels"] if r["level_id"] == 52)
+        self.assertIn("terrain_profile", record)
+        self.assertIn("infrastructure_profile", record)
+        self.assertIn("infrastructure_placements", record)
 
     def test_rules_builder_is_deterministic(self) -> None:
         built = build_rules(ROOT)
@@ -90,6 +128,47 @@ class RulesTests(unittest.TestCase):
                 record = next(r for r in rules["profiles"][profile]["levels"] if r["level_id"] == level_id)
                 self.assertEqual([(u["kind"], u["id"]) for u in record["new_unlocks"]], unlocks)
 
+    def test_station_building_categories_are_known(self) -> None:
+        categories = {building: info.category for building, info in station_info_by_building().items()}
+
+        self.assertEqual(categories[63], "power")
+        self.assertEqual(categories[30], "flak")
+        self.assertEqual(categories[73], "radar")
+
+    def test_infrastructure_profiles_extracted_for_station_heavy_levels(self) -> None:
+        rules = gen4_rules()
+        expected = [
+            ("original", 15),
+            ("original", 52),
+            ("original", 63),
+            ("md-ghorkov", 79),
+            ("md-taerkasten", 78),
+        ]
+
+        for profile, level_id in expected:
+            with self.subTest(profile=profile, level_id=level_id):
+                record = next(r for r in rules["profiles"][profile]["levels"] if r["level_id"] == level_id)
+                counts = record["infrastructure_profile"]["counts"]
+                self.assertGreater(counts["power"], 0)
+                self.assertGreater(counts["flak"], 0)
+                self.assertGreater(counts["radar"], 0)
+                self.assertEqual(sum(counts.values()), len(record["infrastructure_placements"]))
+
+    def test_terrain_profiles_classify_flat_and_varied_levels(self) -> None:
+        rules = gen4_rules()
+
+        for level_id in (3, 25, 26):
+            with self.subTest(level_id=level_id):
+                record = next(r for r in rules["profiles"]["original"]["levels"] if r["level_id"] == level_id)
+                self.assertLessEqual(record["terrain_profile"]["range"], 1)
+                self.assertLessEqual(record["terrain_profile"]["unique_count"], 2)
+
+        for level_id in (52, 63, 61, 51, 62):
+            with self.subTest(level_id=level_id):
+                record = next(r for r in rules["profiles"]["original"]["levels"] if r["level_id"] == level_id)
+                self.assertGreaterEqual(record["terrain_profile"]["range"], 10)
+                self.assertGreaterEqual(record["terrain_profile"]["unique_count"], 10)
+
 
 class GenerationTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -101,6 +180,7 @@ class GenerationTests(unittest.TestCase):
 
         self.assertEqual(a.text, b.text)
         self.assertEqual(a.metadata["generator"], "generator4")
+        self.assertEqual(a.metadata["rules_version"], 2)
         self.assertEqual(a.metadata["level_archetype"], "L0202")
         self.assertEqual(a.metadata["warnings"], [])
 
@@ -154,6 +234,67 @@ class GenerationTests(unittest.TestCase):
                 self.assertTrue(campaign.levels)
                 self.assertTrue(all(level.metadata["warnings"] == [] for level in campaign.levels))
 
+    def test_infrastructure_generated_for_station_archetypes(self) -> None:
+        level = self.generator.generate_single(seed=2026, campaign_profile="original", level_id=15)
+        counts = level.metadata["infrastructure_profile"]["generated_counts"]
+
+        self.assertGreater(counts["power"], 0)
+        self.assertGreater(counts["flak"], 0)
+        self.assertGreater(counts["radar"], 0)
+
+    def test_nonflat_archetype_generates_varied_terrain(self) -> None:
+        level = self.generator.generate_single(seed=2026, campaign_profile="original", level_id=52)
+        terrain = level.metadata["terrain_profile"]
+
+        self.assertGreaterEqual(terrain["generated_unique_heights"], terrain["source_unique_heights"] // 2)
+        self.assertGreaterEqual(terrain["generated_height_range"], terrain["source_height_range"] // 2)
+
+    def test_station_heavy_map_counts_are_capped_and_scattered(self) -> None:
+        level = self.generator.generate_single(seed=2026, campaign_profile="md-ghorkov", level_id=79)
+        counts = level.metadata["infrastructure_profile"]["generated_counts"]
+        cells = _station_cells(level)
+
+        self.assertLessEqual(counts["power"], 8)
+        self.assertLessEqual(counts["flak"], 24)
+        self.assertGreaterEqual(_min_chebyshev_distance([(x, y) for x, y, category, _owner in cells if category == "flak"]), 4)
+        self.assertGreaterEqual(_min_chebyshev_distance([(x, y) for x, y, category, _owner in cells if category == "power"]), 3)
+
+    def test_bomb_defense_level_gives_player_flak_without_overfilling_power(self) -> None:
+        level = self.generator.generate_single(seed=2026, campaign_profile="original", level_id=52)
+        cells = _station_cells(level)
+
+        player_flak = [(x, y) for x, y, category, owner in cells if category == "flak" and owner == 1]
+        self.assertGreaterEqual(len(player_flak), 3)
+        self.assertLessEqual(level.metadata["infrastructure_profile"]["generated_counts"]["power"], 5)
+
+    def test_enemy_radar_is_away_from_owner_base(self) -> None:
+        level = self.generator.generate_single(seed=2026, campaign_profile="md-taerkasten", level_id=78)
+        parsed = parse_ldf(level.text)
+        hosts_by_owner: dict[int, list[tuple[int, int]]] = {}
+        for robo in parsed.robos:
+            hosts_by_owner.setdefault(int(robo["owner"]), []).append(_world_cell(robo))
+
+        player = int(self.generator.profiles.get("md-taerkasten").player_faction)
+        for x, y, category, owner in _station_cells(level):
+            if category != "radar" or owner == player:
+                continue
+            nearest = min(abs(x - hx) + abs(y - hy) for hx, hy in hosts_by_owner[owner])
+            self.assertGreaterEqual(nearest, 6)
+
+    def test_enemy_scout_radar_unit_spawns_near_player_base_when_legal(self) -> None:
+        level = self.generator.generate_single(seed=2026, campaign_profile="original", level_id=2)
+        parsed = parse_ldf(level.text)
+        player = next(robo for robo in parsed.robos if "con_budget" not in robo)
+        px, py = _world_cell(player)
+
+        scout_distances = [
+            abs(_world_cell(squad)[0] - px) + abs(_world_cell(squad)[1] - py)
+            for squad in parsed.squads
+            if int(squad["owner"]) != 1 and int(squad["vehicle"]) in _SCOUT_VEHICLES
+        ]
+        self.assertTrue(scout_distances)
+        self.assertLessEqual(min(scout_distances), 5)
+
     def test_campaign_rewires_gate_targets(self) -> None:
         campaign = self.generator.generate_campaign(seed=5, campaign_profile="md-ghorkov")
         profile = self.generator.profiles.get("md-ghorkov")
@@ -184,6 +325,39 @@ class GenerationTests(unittest.TestCase):
     def test_unknown_profile_rejected(self) -> None:
         with self.assertRaises(ValueError):
             self.generator.generate_single(seed=1, campaign_profile="nope")
+
+
+class MapOverrideTests(unittest.TestCase):
+    def test_beam_gate_keysecs_do_not_force_typ_map(self) -> None:
+        level = SimpleNamespace(gates=[{"sec_x": 2, "sec_y": 2, "keysecs": [{"x": 1, "y": 1}]}])
+        typ = [[0 for _ in range(4)] for _ in range(4)]
+        blg = [[0 for _ in range(4)] for _ in range(4)]
+
+        Generator4Builder()._apply_gate_tiles(level, typ, blg)
+
+        self.assertEqual(typ[2][2], TYP_GATE_CLOSED_1)
+        self.assertEqual(typ[1][1], 0)
+
+    def test_bomb_keysecs_force_key_typ_map(self) -> None:
+        level = SimpleNamespace(
+            items=[
+                {
+                    "sec_x": 2,
+                    "sec_y": 2,
+                    "inactive_bp": 35,
+                    "active_bp": 36,
+                    "trigger_bp": 37,
+                    "keysecs": [{"x": 1, "y": 1}],
+                }
+            ]
+        )
+        typ = [[0 for _ in range(4)] for _ in range(4)]
+        blg = [[0 for _ in range(4)] for _ in range(4)]
+
+        Generator4Builder()._apply_item_tiles(level, typ, blg)
+
+        self.assertEqual(blg[2][2], 35)
+        self.assertEqual(typ[1][1], TYP_GATE_CLOSED_2)
 
 
 class PassabilityTests(unittest.TestCase):

@@ -12,7 +12,7 @@ from .builder import Generator4Builder
 from .context import _Gen4Level
 from .profiles import Generator4ProfileResolver
 from .renderer import Generator4Renderer
-from .rules import Archetype, archetype_for_level, archetype_for_source_level, archetypes_for_profile
+from .rules import Archetype, archetype_for_level, archetype_for_source_level, archetypes_for_profile, rules_version
 from .validate import validate_level
 
 _MAX_GENERATION_ATTEMPTS = 6
@@ -168,7 +168,10 @@ class Generator4:
             "campaign_profile": level.profile_id,
             "source": level.source,
             "level_archetype": level.archetype.name,
+            "rules_version": rules_version(),
             "tech_phase": level.tech_phase,
+            "terrain_profile": level.terrain_profile,
+            "infrastructure_profile": level.infrastructure_profile,
             "warnings": warnings,
             "synth_method": level.synth_method,
         }

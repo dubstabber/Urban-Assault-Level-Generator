@@ -22,7 +22,8 @@ from ..models import MapRows
 from ..startup_scripts import startup_include_for_level
 from ..gen3.synthesis import adjacency_model_for, border_tile, synthesize_typ_map
 from .context import _Gen4Level
-from .passability import synthesize_hgt_map
+from .infrastructure import station_counts, synthesize_infrastructure
+from .passability import required_cells_connected, synthesize_hgt_map, terrain_metrics
 
 _FACTION_PLAYER = 1
 _FACTION_TAERKASTEN = 4
@@ -30,6 +31,13 @@ _FACTION_BLACK_SECT = 5
 _FACTION_TUTOR = 7
 _MD_TAERKASTEN_PROFILE = "md-taerkasten"
 _SCOUT_VEHICLES = {9, 29, 35, 67, 74}
+_SCOUT_VEHICLE_BY_OWNER = {
+    _FACTION_PLAYER: 9,
+    2: 74,
+    3: 67,
+    _FACTION_TAERKASTEN: 35,
+    6: 29,
+}
 
 _ENABLE_OWNER_RE = re.compile(r"(\benable\s*=\s*)(-?\d+)", re.IGNORECASE)
 _SEC_X_RE = re.compile(r"^(\s*sec_x\s*=\s*)-?\d+(.*)$", re.IGNORECASE)
@@ -70,21 +78,23 @@ class Generator4Builder:
         level.gems = self._place_gems(level, occupied)
 
         required = self._required_cells(level, hosts)
-        height_stats = record.get("height_stats", {})
+        terrain_profile = record.get("terrain_profile") or record.get("height_stats", {})
         hgt = synthesize_hgt_map(
             level.width,
             level.height,
             rng,
-            median=int(height_stats.get("median", 0x7F) or 0x7F),
+            median=int(terrain_profile.get("median", 0x7F) or 0x7F),
             required_cells=required,
-            target_blocked_ratio=float(height_stats.get("blocked_edge_ratio", 0.0) or 0.0),
+            target_blocked_ratio=float(terrain_profile.get("blocked_edge_ratio", 0.0) or 0.0),
+            terrain_profile=terrain_profile,
         )
-        own = self._own_map(level, hosts)
         blg = filled_rows(level.width, level.height, 0)
         self._apply_host_buildings(level, hosts, typ, blg)
         self._apply_gate_tiles(level, typ, blg)
         self._apply_item_tiles(level, typ, blg)
         self._apply_gem_tiles(level, typ, blg)
+        level.infrastructure = synthesize_infrastructure(level, hosts, occupied, typ, blg, hgt)
+        own = self._own_map(level, hosts, level.infrastructure)
 
         level.maps = {"typ": typ, "own": own, "hgt": hgt, "blg": blg}
         level.robos = [self._robo(level, host) for host in hosts]
@@ -95,6 +105,8 @@ class Generator4Builder:
             "baseline_level_ids": self._baseline_level_ids(level),
             "new_unlocks": list(record.get("new_unlocks", [])),
         }
+        level.terrain_profile = self._terrain_metadata(terrain_profile, hgt)
+        level.infrastructure_profile = self._infrastructure_metadata(level)
 
     # -- enables --------------------------------------------------------------
 
@@ -276,19 +288,108 @@ class Generator4Builder:
             squads.append(squad)
             if len(squads) >= 100:
                 break
+        self._maybe_add_scout_near_player(level, hosts, occupied, squads)
         return squads
+
+    def _maybe_add_scout_near_player(
+        self,
+        level: _Gen4Level,
+        hosts: list[dict[str, Any]],
+        occupied: set[tuple[int, int]],
+        squads: list[dict[str, Any]],
+    ) -> None:
+        if len(squads) >= 100:
+            return
+        player_host = next((host for host in hosts if host.get("is_player")), None)
+        if player_host is None:
+            return
+        candidates: list[tuple[int, int]] = []
+        for owner, legal in sorted(level.legal_vehicles_by_owner.items()):
+            if owner in {0, _FACTION_TUTOR, level.player_faction}:
+                continue
+            vehicle = self._scout_vehicle_for_owner(owner, legal)
+            if vehicle is not None:
+                candidates.append((owner, vehicle))
+        if not candidates:
+            return
+        owner, vehicle = candidates[level.rng.rand_mod(len(candidates))]
+        cell = self._scout_cell_near_player(level, (int(player_host["x"]), int(player_host["y"])), occupied)
+        if cell is None:
+            return
+        occupied.add(cell)
+        squads.append(
+            {
+                "owner": owner,
+                "vehicle": vehicle,
+                "num": 1,
+                "pos_x": sector_to_world_x(cell[0], plus_one=True),
+                "pos_z": sector_to_world_z(cell[1], plus_one=True),
+            }
+        )
+
+    @staticmethod
+    def _scout_vehicle_for_owner(owner: int, legal: set[int]) -> int | None:
+        if owner == _FACTION_BLACK_SECT:
+            scouts = sorted(set(legal) & _SCOUT_VEHICLES)
+            return scouts[0] if scouts else None
+        preferred = _SCOUT_VEHICLE_BY_OWNER.get(owner)
+        if preferred in legal:
+            return preferred
+        scouts = sorted(set(legal) & _SCOUT_VEHICLES)
+        return scouts[0] if scouts else None
+
+    def _scout_cell_near_player(
+        self,
+        level: _Gen4Level,
+        player_cell: tuple[int, int],
+        occupied: set[tuple[int, int]],
+    ) -> tuple[int, int] | None:
+        px, py = player_cell
+        candidates: list[tuple[int, int, int]] = []
+        for y in range(max(1, py - 5), min(level.height - 1, py + 6)):
+            for x in range(max(1, px - 5), min(level.width - 1, px + 6)):
+                cell = (x, y)
+                if cell in occupied:
+                    continue
+                distance = abs(x - px) + abs(y - py)
+                if not (2 <= distance <= 7):
+                    continue
+                hgt = level.maps.get("hgt", [])
+                if hgt and not required_cells_connected(hgt, [player_cell, cell]):
+                    continue
+                candidates.append((abs(distance - 4) * 4 + level.rng.rand_mod(5), x, y))
+        if not candidates:
+            return None
+        candidates.sort()
+        return candidates[0][1], candidates[0][2]
 
     # -- maps -----------------------------------------------------------------
 
-    def _own_map(self, level: _Gen4Level, hosts: list[dict[str, Any]]) -> MapRows:
+    def _own_map(
+        self,
+        level: _Gen4Level,
+        hosts: list[dict[str, Any]],
+        infrastructure: list[dict[str, Any]],
+    ) -> MapRows:
         rows = filled_rows(level.width, level.height, 0)
-        seeds = [host for host in hosts if host["faction"] != _FACTION_TUTOR]
+        seeds: list[dict[str, Any]] = [
+            {"x": host["x"], "y": host["y"], "faction": host["faction"]}
+            for host in hosts
+            if host["faction"] != _FACTION_TUTOR
+        ]
+        seeds.extend(
+            {"x": item["x"], "y": item["y"], "faction": item["owner"]}
+            for item in infrastructure
+            if int(item.get("owner", 0)) not in {0, _FACTION_TUTOR}
+        )
         if not seeds:
             return rows
         for y in range(1, level.height - 1):
             for x in range(1, level.width - 1):
                 nearest = min(seeds, key=lambda host: (host["x"] - x) ** 2 + (host["y"] - y) ** 2)
                 rows[y][x] = int(nearest["faction"])
+        for item in infrastructure:
+            rows[int(item["y"])][int(item["x"])] = int(item["owner"])
         return rows
 
     def _apply_host_buildings(self, level: _Gen4Level, hosts: list[dict[str, Any]], typ: MapRows, blg: MapRows) -> None:
@@ -305,9 +406,6 @@ class Generator4Builder:
         for gate in level.gates:
             typ[gate["sec_y"]][gate["sec_x"]] = TYP_GATE_CLOSED_1
             blg[gate["sec_y"]][gate["sec_x"]] = 0
-            for key in gate.get("keysecs", []):
-                typ[key["y"]][key["x"]] = TYP_GATE_CLOSED_2
-                blg[key["y"]][key["x"]] = 0
 
     def _apply_item_tiles(self, level: _Gen4Level, typ: MapRows, blg: MapRows) -> None:
         for item in level.items:
@@ -315,6 +413,9 @@ class Generator4Builder:
                 if item.get(key) is not None:
                     blg[item["sec_y"]][item["sec_x"]] = int(item[key])
                     break
+            for key in item.get("keysecs", []):
+                typ[key["y"]][key["x"]] = TYP_GATE_CLOSED_2
+                blg[key["y"]][key["x"]] = 0
 
     def _apply_gem_tiles(self, level: _Gen4Level, typ: MapRows, blg: MapRows) -> None:
         for raw in level.gems:
@@ -331,6 +432,32 @@ class Generator4Builder:
                 continue
             blg[y][x] = building
             typ[y][x] = BUILDING_TYP_BY_ID.get(building, typ[y][x])
+
+    # -- metadata -------------------------------------------------------------
+
+    @staticmethod
+    def _terrain_metadata(source_profile: dict[str, Any], generated_hgt: MapRows) -> dict[str, Any]:
+        generated = terrain_metrics(generated_hgt)
+        return {
+            "source_unique_heights": int(source_profile.get("unique_count", 1) or 1),
+            "generated_unique_heights": int(generated["unique_count"]),
+            "source_height_range": int(source_profile.get("range", 0) or 0),
+            "generated_height_range": int(generated["range"]),
+            "source_blocked_edge_ratio": float(source_profile.get("blocked_edge_ratio", 0.0) or 0.0),
+            "generated_blocked_edge_ratio": float(generated["blocked_edge_ratio"]),
+        }
+
+    @staticmethod
+    def _infrastructure_metadata(level: _Gen4Level) -> dict[str, Any]:
+        source_profile = level.archetype.record.get("infrastructure_profile", {})
+        return {
+            "source_counts": {
+                "power": int(source_profile.get("counts", {}).get("power", 0) or 0),
+                "flak": int(source_profile.get("counts", {}).get("flak", 0) or 0),
+                "radar": int(source_profile.get("counts", {}).get("radar", 0) or 0),
+            },
+            "generated_counts": station_counts(level.infrastructure),
+        }
 
     # -- entities -------------------------------------------------------------
 

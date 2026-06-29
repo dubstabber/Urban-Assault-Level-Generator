@@ -47,3 +47,6 @@ class _Gen4Level:
     required_route_cells: list[tuple[int, int]] = field(default_factory=list)
     legal_vehicles_by_owner: dict[int, set[int]] = field(default_factory=dict)
     tech_phase: dict[str, Any] = field(default_factory=dict)
+    infrastructure: list[dict[str, Any]] = field(default_factory=list)
+    terrain_profile: dict[str, Any] = field(default_factory=dict)
+    infrastructure_profile: dict[str, Any] = field(default_factory=dict)

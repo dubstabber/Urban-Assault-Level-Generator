@@ -64,9 +64,13 @@ def _load_rules() -> dict[str, Any]:
 @cache
 def rules_data() -> dict[str, Any]:
     data = _load_rules()
-    if data.get("version") != 1:
+    if data.get("version") not in {1, 2}:
         raise ValueError("Unsupported Generator4 rules version.")
     return data
+
+
+def rules_version() -> int:
+    return int(rules_data().get("version", 1))
 
 
 def profile_names() -> tuple[str, ...]:

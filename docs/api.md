@@ -303,6 +303,8 @@ Campaign-aware hybrid synthesis. Generator4 uses the baked
 `src/ualg/data/gen4_rules.json` rules dataset to select a campaign slot
 archetype, keeps its size and tileset, synthesizes new WFC terrain, and limits
 enemy rosters, upgrade gems, startup includes, and gate wiring to that slot.
+Rules version 2 also carries authored terrain targets and source power/flak/radar
+infrastructure patterns, which Generator4 applies by default.
 
 ### `generate_single`
 
@@ -336,7 +338,8 @@ generate_single(
 | `zero_enemy_station_delays` | `False` | Set all enemy host station `*_delay` values to `0`. |
 
 Metadata includes `"generator": "generator4"`, `"level_archetype"`,
-`"source"`, `"tech_phase"`, `"synth_method"`, and `"warnings"`.
+`"source"`, `"rules_version"`, `"tech_phase"`, `"terrain_profile"`,
+`"infrastructure_profile"`, `"synth_method"`, and `"warnings"`.
 
 ### `generate_campaign`
 
