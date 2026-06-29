@@ -10,11 +10,22 @@ from __future__ import annotations
 from typing import Any
 
 from ..campaign_profiles import ProfileRoster
-from ..constants import BLACK_SECT_ENABLE_EXCLUDED_BUILDING_IDS
+from ..constants import (
+    BLACK_SECT_ENABLE_EXCLUDED_BUILDING_IDS,
+    ENABLE_EXCLUDED_VEHICLE_IDS,
+    MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS,
+)
 from ..models import MapRows
 from ..rng import MSVCRTRandom
 
+_FACTION_TAERKASTEN = 4
 _FACTION_BLACK_SECT = 5
+_FACTION_PLAYER = 1
+
+# Mirror Generator2's begin_enable exclusions, keyed by numeric faction.
+_VEHICLE_EXCLUDED_FACTIONS = {_FACTION_PLAYER, _FACTION_BLACK_SECT}
+_MD_TAERKASTEN_PROFILE = "md-taerkasten"
+_MD_TAERKASTEN_VEHICLE_EXCLUDED_FACTIONS = {_FACTION_TAERKASTEN, _FACTION_BLACK_SECT}
 
 
 def build_faction_remap(
@@ -86,21 +97,30 @@ def choose_squad_vehicle(rng: MSVCRTRandom, roster: ProfileRoster, faction: int,
     return rng.choice(vehicles)
 
 
-def build_enables(roster: ProfileRoster, factions: list[int]) -> list[dict[str, Any]]:
-    """Build begin_enable blocks for the present factions, in faction order."""
+def build_enables(roster: ProfileRoster, factions: list[int], *, profile_id: str = "") -> list[dict[str, Any]]:
+    """Build begin_enable blocks for the present factions, in faction order.
+
+    Applies Generator2-equivalent vehicle/building exclusions: single-player-only
+    Resistance/Black-Sect units (11/133/134) are never enabled, the md-taerkasten
+    campaign drops 143/144 for Taerkasten and Black Sect, and Black Sect's
+    flak/radar/power buildings are excluded.
+    """
 
     enables: list[dict[str, Any]] = []
     for faction in sorted(set(factions)):
         if not isinstance(faction, int) or not roster.vehicles_by_faction.get(faction):
             continue
+
+        excluded_vehicles: set[int] = set()
+        if faction in _VEHICLE_EXCLUDED_FACTIONS:
+            excluded_vehicles |= ENABLE_EXCLUDED_VEHICLE_IDS
+        if profile_id == _MD_TAERKASTEN_PROFILE and faction in _MD_TAERKASTEN_VEHICLE_EXCLUDED_FACTIONS:
+            excluded_vehicles |= MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS
+        vehicles = [v for v in roster.vehicles_by_faction[faction] if v not in excluded_vehicles]
+
         buildings = list(roster.buildings_by_faction.get(faction, ()))
         if faction == _FACTION_BLACK_SECT:
             buildings = [b for b in buildings if b not in BLACK_SECT_ENABLE_EXCLUDED_BUILDING_IDS]
-        enables.append(
-            {
-                "owner": faction,
-                "vehicles": list(roster.vehicles_by_faction.get(faction, ())),
-                "buildings": buildings,
-            }
-        )
+
+        enables.append({"owner": faction, "vehicles": vehicles, "buildings": buildings})
     return enables

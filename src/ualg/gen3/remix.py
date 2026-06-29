@@ -137,7 +137,7 @@ class Generator3RemixBuilder:
 
     def _build_enables(self, level: _Gen3Level) -> list[dict[str, Any]]:
         present = [level.player_faction, *level.faction_remap.values()]
-        return build_enables(level.profile.roster, present)
+        return build_enables(level.profile.roster, present, profile_id=level.profile_id)
 
     def _remix_prototype(self, level: _Gen3Level) -> list[str]:
         include_line = startup_include_for_level(level.profile_id, level.level_id)

@@ -59,7 +59,7 @@ class Generator3SynthBuilder:
         level.robos = [self._host_robo(level, host) for host in hosts]
         level.squads = self._place_squads(level, hosts)
         level.gates = [self._place_gate(level, hosts)]
-        level.enables = build_enables(roster, [host["faction"] for host in hosts])
+        level.enables = build_enables(roster, [host["faction"] for host in hosts], profile_id=level.profile_id)
         level.prototype = [startup_include_for_level(level.profile_id, level.level_id)]
         level.sky = f"objects/{rng.choice(SKY_OPTIONS)}"
         level.mission_briefing_map = profile.mission_briefing_map_for_level(level.level_id)

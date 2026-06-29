@@ -59,6 +59,15 @@ BLG_SUPERITEM = 35
 
 BLACK_SECT_ENABLE_EXCLUDED_BUILDING_IDS = {64, 28, 2, 54, 30, 71, 31, 73, 13, 72, 74}
 
+# Vehicles that must never appear in a begin_enable block. Shared by Generator2
+# and Generator3 so the two generators cannot drift.
+# 11 Rock Sled, 133 Gigant(Blue), 134 Bronsteijn(Blue): single-player-only
+# Resistance/Black-Sect units. Excluded for Resistance and Black Sect always.
+ENABLE_EXCLUDED_VEHICLE_IDS = frozenset({11, 133, 134})
+# 143 Thor's Hammer, 144 Ostwind: Metropolis Dawn Taerkasten units. Excluded for
+# Taerkasten and Black Sect under the md-taerkasten campaign.
+MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS = frozenset({143, 144})
+
 FACTION_NEUTRAL = 0
 FACTION_PLAYER = 1
 FACTION_SULGOGARS = 2

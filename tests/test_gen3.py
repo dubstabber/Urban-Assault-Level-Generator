@@ -8,12 +8,21 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 sys.path.insert(0, str(SRC))
 
+from ualg.constants import (
+    ENABLE_EXCLUDED_VEHICLE_IDS,
+    MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS,
+)
 from ualg.gen3.corpus import skeleton_by_name, skeletons_for_source
 from ualg.gen3.ldf_reader import parse_ldf
+from ualg.gen3.placement import build_enables
 from ualg.gen3.synthesis import adjacency_model_for, border_tile, synthesize_typ_map
 from ualg.generator3 import Generator3
 from ualg.ldf import parse_maps
 from ualg.rng import MSVCRTRandom
+
+_FACTION_RESISTANCE = 1
+_FACTION_TAERKASTEN = 4
+_FACTION_BLACK_SECT = 5
 
 _SAMPLE_LDF = """begin_level
 \tset\t=\t1
@@ -288,6 +297,44 @@ class SynthesisTests(unittest.TestCase):
     def test_unknown_mode_rejected(self) -> None:
         with self.assertRaises(ValueError):
             self.generator.generate_single(seed=1, mode="nonsense")
+
+
+class EnableExclusionTests(unittest.TestCase):
+    """Generator3 mirrors Generator2's begin_enable exclusions."""
+
+    def setUp(self) -> None:
+        self.generator = Generator3()
+
+    def _enables_by_owner(self, profile: str, factions: list[int], profile_id: str) -> dict[int, dict]:
+        roster = self.generator.profiles.get(profile).roster
+        return {e["owner"]: e for e in build_enables(roster, factions, profile_id=profile_id)}
+
+    def test_resistance_and_black_sect_exclude_single_player_units(self) -> None:
+        for profile_id in ("original", "md-ghorkov", "md-taerkasten"):
+            profile = profile_id if profile_id != "md-ghorkov" else "md-ghorkov"
+            enables = self._enables_by_owner(profile, [_FACTION_RESISTANCE, _FACTION_BLACK_SECT], profile_id)
+            for faction in (_FACTION_RESISTANCE, _FACTION_BLACK_SECT):
+                for vehicle in ENABLE_EXCLUDED_VEHICLE_IDS:
+                    self.assertNotIn(vehicle, enables[faction]["vehicles"], f"{profile_id}/{faction}")
+
+    def test_md_taerkasten_excludes_taerkasten_units(self) -> None:
+        enables = self._enables_by_owner("md-taerkasten", [_FACTION_TAERKASTEN, _FACTION_BLACK_SECT], "md-taerkasten")
+        for faction in (_FACTION_TAERKASTEN, _FACTION_BLACK_SECT):
+            for vehicle in MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS:
+                self.assertNotIn(vehicle, enables[faction]["vehicles"])
+
+    def test_taerkasten_units_kept_outside_md_taerkasten(self) -> None:
+        # The 143/144 exclusion is gated on the md-taerkasten profile only.
+        enables = self._enables_by_owner("md-ghorkov", [_FACTION_TAERKASTEN], "md-ghorkov")
+        self.assertTrue(set(MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS) & set(enables[_FACTION_TAERKASTEN]["vehicles"]))
+
+    def test_black_sect_buildings_excluded(self) -> None:
+        from ualg.constants import BLACK_SECT_ENABLE_EXCLUDED_BUILDING_IDS
+
+        enables = self._enables_by_owner("original", [_FACTION_BLACK_SECT], "original")
+        self.assertFalse(
+            set(BLACK_SECT_ENABLE_EXCLUDED_BUILDING_IDS) & set(enables[_FACTION_BLACK_SECT]["buildings"])
+        )
 
 
 if __name__ == "__main__":
