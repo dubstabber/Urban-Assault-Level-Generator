@@ -338,8 +338,9 @@ class MapOverrideTests(unittest.TestCase):
         self.assertEqual(typ[2][2], TYP_GATE_CLOSED_1)
         self.assertEqual(typ[1][1], 0)
 
-    def test_bomb_keysecs_force_key_typ_map(self) -> None:
+    def test_bomb_keysecs_without_four_road_edges_use_243(self) -> None:
         level = SimpleNamespace(
+            source="vanilla",
             items=[
                 {
                     "sec_x": 2,
@@ -358,6 +359,31 @@ class MapOverrideTests(unittest.TestCase):
 
         self.assertEqual(blg[2][2], 35)
         self.assertEqual(typ[1][1], TYP_GATE_CLOSED_2)
+
+    def test_bomb_keysecs_with_four_road_edges_use_244(self) -> None:
+        level = SimpleNamespace(
+            source="vanilla",
+            items=[
+                {
+                    "sec_x": 3,
+                    "sec_y": 3,
+                    "inactive_bp": 35,
+                    "active_bp": 36,
+                    "trigger_bp": 37,
+                    "keysecs": [{"x": 2, "y": 2}],
+                }
+            ]
+        )
+        typ = [[0 for _ in range(5)] for _ in range(5)]
+        blg = [[0 for _ in range(5)] for _ in range(5)]
+        typ[1][2] = 7
+        typ[2][3] = 18
+        typ[3][2] = 166
+        typ[2][1] = 18
+
+        Generator4Builder()._apply_item_tiles(level, typ, blg)
+
+        self.assertEqual(typ[2][2], TYP_GATE_CLOSED_1)
 
 
 class PassabilityTests(unittest.TestCase):

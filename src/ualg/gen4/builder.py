@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 import re
 from math import floor
 from typing import Any
@@ -20,6 +21,7 @@ from ..constants import (
 from ..core.maps import filled_rows
 from ..models import MapRows
 from ..startup_scripts import startup_include_for_level
+from ..gen3.corpus import skeletons_for_source
 from ..gen3.synthesis import adjacency_model_for, border_tile, synthesize_typ_map
 from .context import _Gen4Level
 from .infrastructure import station_counts, synthesize_infrastructure
@@ -414,8 +416,27 @@ class Generator4Builder:
                     blg[item["sec_y"]][item["sec_x"]] = int(item[key])
                     break
             for key in item.get("keysecs", []):
-                typ[key["y"]][key["x"]] = TYP_GATE_CLOSED_2
+                typ[key["y"]][key["x"]] = self._bomb_key_typ(level, typ, int(key["x"]), int(key["y"]))
                 blg[key["y"]][key["x"]] = 0
+
+    def _bomb_key_typ(self, level: _Gen4Level, typ: MapRows, x: int, y: int) -> int:
+        if self._bomb_key_has_four_road_edges(str(getattr(level, "source", "")), typ, x, y):
+            return TYP_GATE_CLOSED_1
+        return TYP_GATE_CLOSED_2
+
+    @staticmethod
+    def _bomb_key_has_four_road_edges(source: str, typ: MapRows, x: int, y: int) -> bool:
+        if not (0 < y < len(typ) - 1 and 0 < x < len(typ[y]) - 1):
+            return False
+        edges = _bomb_key_road_edge_tiles(source)
+        if not all(edges.values()):
+            return False
+        return (
+            int(typ[y - 1][x]) in edges["north"]
+            and int(typ[y][x + 1]) in edges["east"]
+            and int(typ[y + 1][x]) in edges["south"]
+            and int(typ[y][x - 1]) in edges["west"]
+        )
 
     def _apply_gem_tiles(self, level: _Gen4Level, typ: MapRows, blg: MapRows) -> None:
         for raw in level.gems:
@@ -614,3 +635,27 @@ class Generator4Builder:
         x = max(1, int(round((int(entity["pos_x"]) - 1) / 1200 - 0.5)))
         y = max(1, int(round((-(int(entity["pos_z"]) - 1)) / 1200 - 0.5)))
         return x, y
+
+
+@lru_cache(maxsize=None)
+def _bomb_key_road_edge_tiles(source: str) -> dict[str, frozenset[int]]:
+    edges: dict[str, set[int]] = {"north": set(), "east": set(), "south": set(), "west": set()}
+    if not source:
+        return {key: frozenset() for key in edges}
+    for skeleton in skeletons_for_source(source):
+        typ = skeleton.maps().get("typ", [])
+        if not typ:
+            continue
+        for item in skeleton.record.get("items", []):
+            for key in item.get("keysecs", []):
+                x = int(key["x"])
+                y = int(key["y"])
+                if not (0 < y < len(typ) - 1 and 0 < x < len(typ[y]) - 1):
+                    continue
+                if int(typ[y][x]) != TYP_GATE_CLOSED_1:
+                    continue
+                edges["north"].add(int(typ[y - 1][x]))
+                edges["east"].add(int(typ[y][x + 1]))
+                edges["south"].add(int(typ[y + 1][x]))
+                edges["west"].add(int(typ[y][x - 1]))
+    return {key: frozenset(values) for key, values in edges.items()}
