@@ -33,7 +33,7 @@ from ..startup_scripts import startup_include_for_level
 from ..gen3.corpus import skeletons_for_source
 from ..gen3.synthesis import adjacency_model_for, border_tile, synthesize_typ_map
 from .context import _Gen4Level
-from .difficulty import is_extremely_hard, is_hard_or_harder
+from .difficulty import EXTREMELY_HARD_MODE, HARD_MODE, NORMAL_MODE, is_extremely_hard, is_hard_or_harder
 from .infrastructure import station_counts, synthesize_infrastructure
 from .passability import required_cells_connected, synthesize_hgt_map, terrain_metrics
 
@@ -43,6 +43,15 @@ _FACTION_BLACK_SECT = 5
 _FACTION_TUTOR = 7
 _MD_TAERKASTEN_PROFILE = "md-taerkasten"
 _SCOUT_VEHICLES = {9, 29, 35, 67, 74}
+_PLAYER_ENERGY_BY_DIFFICULTY = {
+    NORMAL_MODE: (350000, 1200000),
+    HARD_MODE: (350000, 1200000),
+    EXTREMELY_HARD_MODE: (350000, 1200000),
+}
+_EXTREME_PLAYER_ENERGY_SCALE_NUM = 70
+_EXTREME_PLAYER_ENERGY_SCALE_DEN = 100
+_HARD_ENEMY_ENERGY_SCALE_NUM = 160
+_HARD_ENEMY_ENERGY_SCALE_DEN = 100
 _SCOUT_VEHICLE_BY_OWNER = {
     _FACTION_PLAYER: 9,
     2: 74,
@@ -602,12 +611,13 @@ class Generator4Builder:
         out: dict[str, Any] = {"owner": faction}
         out["vehicle"] = self._player_vehicle(level, source) if is_player else self._host_vehicle(level, faction, source)
         energy = self._host_energy(level, source, faction, is_player)
+        reload_const = self._host_reload_const(level, source, faction, energy, is_player)
         out.update({
             "pos_x": sector_to_world_x(host["x"], plus_one=True),
             "pos_y": int(source.get("pos_y", -300)),
             "pos_z": sector_to_world_z(host["y"], plus_one=True),
             "energy": energy,
-            "reload_const": int(source.get("reload_const", floor((((energy - 550000) / 4) + 550000) / 5) if is_player else floor(((energy - 500000) / 3) + 500000))),
+            "reload_const": reload_const,
         })
         if source.get("viewangle") is not None:
             out["viewangle"] = source["viewangle"]
@@ -628,11 +638,43 @@ class Generator4Builder:
     @staticmethod
     def _host_energy(level: _Gen4Level, source: dict[str, Any], faction: int, is_player: bool) -> int:
         energy = int(source.get("energy", 600000 if is_player else 1200000))
-        if is_player and is_extremely_hard(level.difficulty_mode):
-            return max(150000, min(energy, level.rng.rand_range(3, 5) * 100000) * 2 // 3)
+        if is_player:
+            return Generator4Builder._player_progression_energy(level, energy)
         if not is_player and faction != _FACTION_TUTOR and is_hard_or_harder(level.difficulty_mode):
-            return max(energy, level.rng.rand_range(8, 22) * 100000)
+            return max(1, energy * _HARD_ENEMY_ENERGY_SCALE_NUM // _HARD_ENEMY_ENERGY_SCALE_DEN)
         return energy
+
+    @staticmethod
+    def _player_progression_energy(level: _Gen4Level, fallback: int) -> int:
+        start, end = _PLAYER_ENERGY_BY_DIFFICULTY.get(level.difficulty_mode, _PLAYER_ENERGY_BY_DIFFICULTY[NORMAL_MODE])
+        level_ids = list(level.profile.level_ids)
+        if not level_ids:
+            return fallback
+        try:
+            index = level_ids.index(level.level_id)
+        except ValueError:
+            return fallback
+        span = max(1, len(level_ids) - 1)
+        energy = start + ((end - start) * index // span)
+        energy = (energy // 10000) * 10000
+        if is_extremely_hard(level.difficulty_mode):
+            return max(1, energy * _EXTREME_PLAYER_ENERGY_SCALE_NUM // _EXTREME_PLAYER_ENERGY_SCALE_DEN)
+        return energy
+
+    @staticmethod
+    def _host_reload_const(
+        level: _Gen4Level,
+        source: dict[str, Any],
+        faction: int,
+        energy: int,
+        is_player: bool,
+    ) -> int:
+        source_energy = source.get("energy")
+        if source_energy is not None and int(source_energy) == energy and source.get("reload_const") is not None:
+            return int(source["reload_const"])
+        if is_player:
+            return floor((((energy - 550000) / 4) + 550000) / 5)
+        return floor(((energy - 500000) / 3) + 500000)
 
     def _player_vehicle(self, level: _Gen4Level, source: dict[str, Any]) -> int:
         by_level = level.profile.player_robo_by_level.get(level.level_id)

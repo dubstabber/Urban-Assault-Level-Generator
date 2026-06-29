@@ -324,19 +324,53 @@ class GenerationTests(unittest.TestCase):
         self.assertEqual(player_power, [])
         self.assertLessEqual(len(player_flak), 1)
 
-    def test_hard_mode_raises_enemy_host_energy(self) -> None:
+    def test_hard_mode_scales_enemy_host_energy_and_reload(self) -> None:
         normal = parse_ldf(self.generator.generate_single(seed=2026, campaign_profile="original", level_id=2).text)
         hard = parse_ldf(
             self.generator.generate_single(seed=2026, campaign_profile="original", level_id=2, difficulty_mode="hard").text
         )
 
-        normal_enemy_energy = [int(robo["energy"]) for robo in normal.robos if int(robo["owner"]) != 1]
-        hard_enemy_energy = [int(robo["energy"]) for robo in hard.robos if int(robo["owner"]) != 1]
+        normal_enemies = [robo for robo in normal.robos if int(robo["owner"]) != 1]
+        hard_enemies = [robo for robo in hard.robos if int(robo["owner"]) != 1]
 
-        self.assertEqual(len(hard_enemy_energy), len(normal_enemy_energy))
-        for hard_energy, normal_energy in zip(hard_enemy_energy, normal_enemy_energy, strict=True):
-            self.assertGreaterEqual(hard_energy, normal_energy)
-            self.assertGreaterEqual(hard_energy, 800000)
+        self.assertEqual(len(hard_enemies), len(normal_enemies))
+        for normal_robo, hard_robo in zip(normal_enemies, hard_enemies, strict=True):
+            hard_energy = int(hard_robo["energy"])
+            expected_energy = int(normal_robo["energy"]) * 160 // 100
+            expected_reload = ((expected_energy - 500000) // 3) + 500000
+
+            self.assertEqual(hard_energy, expected_energy)
+            self.assertEqual(int(hard_robo["reload_const"]), expected_reload)
+
+    def test_player_host_energy_increases_by_campaign_progress_and_difficulty(self) -> None:
+        energies: dict[str, tuple[int, int]] = {}
+        for mode in ("normal", "hard", "extremely-hard"):
+            early = parse_ldf(
+                self.generator.generate_single(
+                    seed=2026,
+                    campaign_profile="md-ghorkov",
+                    level_id=7,
+                    difficulty_mode=mode,
+                ).text
+            )
+            late = parse_ldf(
+                self.generator.generate_single(
+                    seed=2026,
+                    campaign_profile="md-ghorkov",
+                    level_id=79,
+                    difficulty_mode=mode,
+                ).text
+            )
+            early_player = next(robo for robo in early.robos if int(robo["owner"]) == 6)
+            late_player = next(robo for robo in late.robos if int(robo["owner"]) == 6)
+            energies[mode] = (int(early_player["energy"]), int(late_player["energy"]))
+
+            self.assertGreater(energies[mode][1], energies[mode][0])
+
+        self.assertEqual(energies["normal"], energies["hard"])
+        self.assertEqual(energies["extremely-hard"][0], energies["normal"][0] * 70 // 100)
+        self.assertEqual(energies["extremely-hard"][1], energies["normal"][1] * 70 // 100)
+        self.assertGreater(energies["hard"][1], energies["extremely-hard"][1])
 
     def test_extremely_hard_lowers_player_energy_and_expands_enemy_enables(self) -> None:
         normal = parse_ldf(self.generator.generate_single(seed=2026, campaign_profile="original", level_id=2).text)
