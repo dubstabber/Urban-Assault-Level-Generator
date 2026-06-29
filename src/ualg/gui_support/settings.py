@@ -14,6 +14,7 @@ UA_SECTION = "UA Installed Folder"
 GENERATOR1_SECTION = "Generator1"
 GENERATOR2_SECTION = "Generator2"
 GENERATOR3_SECTION = "Generator3"
+GENERATOR4_SECTION = "Generator4"
 
 
 
@@ -33,6 +34,10 @@ class GuiSettings:
     generator3_campaign_directory: str = ""
     generator3_zero_enemy_station_delays: bool = False
     generator3_zero_enemy_radar_budgets: bool = False
+    generator4_single_level_file: str = ""
+    generator4_campaign_directory: str = ""
+    generator4_zero_enemy_station_delays: bool = False
+    generator4_zero_enemy_radar_budgets: bool = False
 
 
 
@@ -72,6 +77,14 @@ def load_settings(path: str | Path | None = None) -> GuiSettings:
         generator3_zero_enemy_radar_budgets=_truthy(
             _get_option(parser, GENERATOR3_SECTION, "ZeroEnemyRadarBudgets", default="0")
         ),
+        generator4_single_level_file=_get_option(parser, GENERATOR4_SECTION, "SingleLevelFile"),
+        generator4_campaign_directory=_get_option(parser, GENERATOR4_SECTION, "CampaignDirectory"),
+        generator4_zero_enemy_station_delays=_truthy(
+            _get_option(parser, GENERATOR4_SECTION, "ZeroEnemyStationDelays", default="0")
+        ),
+        generator4_zero_enemy_radar_budgets=_truthy(
+            _get_option(parser, GENERATOR4_SECTION, "ZeroEnemyRadarBudgets", default="0")
+        ),
     )
 
 
@@ -105,6 +118,12 @@ def save_settings(settings: GuiSettings, path: str | Path | None = None) -> Path
         "CampaignDirectory": settings.generator3_campaign_directory,
         "ZeroEnemyStationDelays": "1" if settings.generator3_zero_enemy_station_delays else "0",
         "ZeroEnemyRadarBudgets": "1" if settings.generator3_zero_enemy_radar_budgets else "0",
+    }
+    parser[GENERATOR4_SECTION] = {
+        "SingleLevelFile": settings.generator4_single_level_file,
+        "CampaignDirectory": settings.generator4_campaign_directory,
+        "ZeroEnemyStationDelays": "1" if settings.generator4_zero_enemy_station_delays else "0",
+        "ZeroEnemyRadarBudgets": "1" if settings.generator4_zero_enemy_radar_budgets else "0",
     }
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     with settings_path.open("w", encoding="utf-8", newline="") as handle:

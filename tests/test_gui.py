@@ -27,6 +27,8 @@ from ualg.gui_support.workflows import (
     generate_generator2_campaign,
     generate_generator3_campaign,
     generate_generator3_single,
+    generate_generator4_campaign,
+    generate_generator4_single,
 )
 
 
@@ -81,6 +83,10 @@ class GuiHelperTests(unittest.TestCase):
             generator3_campaign_directory=str(self.tmp_path / "gen3_campaign"),
             generator3_zero_enemy_station_delays=True,
             generator3_zero_enemy_radar_budgets=True,
+            generator4_single_level_file=str(self.tmp_path / "gen4_single.ldf"),
+            generator4_campaign_directory=str(self.tmp_path / "gen4_campaign"),
+            generator4_zero_enemy_station_delays=True,
+            generator4_zero_enemy_radar_budgets=True,
         )
 
         saved = save_settings(settings, path)
@@ -118,6 +124,10 @@ class GuiHelperTests(unittest.TestCase):
         self.assertEqual(loaded.generator2_campaign_directory, "")
         self.assertFalse(loaded.generator2_zero_enemy_station_delays)
         self.assertFalse(loaded.generator2_zero_enemy_radar_budgets)
+        self.assertEqual(loaded.generator4_single_level_file, "")
+        self.assertEqual(loaded.generator4_campaign_directory, "")
+        self.assertFalse(loaded.generator4_zero_enemy_station_delays)
+        self.assertFalse(loaded.generator4_zero_enemy_radar_budgets)
 
     def test_load_settings_reads_generator2_paths(self) -> None:
         path = self.tmp_path / "RandomUA.ini"
@@ -325,6 +335,66 @@ class GuiHelperTests(unittest.TestCase):
         self.assertEqual(result.campaign_profile, "md-ghorkov")
         self.assertEqual(len(result.written), len(result.campaign.levels))
         self.assertTrue(result.written)
+        self.assertTrue(all(path.exists() for path in result.written))
+
+    def test_load_settings_reads_generator4_paths(self) -> None:
+        path = self.tmp_path / "RandomUA.ini"
+        path.write_text(
+            "\n".join(
+                [
+                    "[Generator4]",
+                    "SingleLevelFile=C:/levels/gen4.ldf",
+                    "CampaignDirectory=C:/levels/gen4camp",
+                    "ZeroEnemyStationDelays=1",
+                    "ZeroEnemyRadarBudgets=1",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        loaded = load_settings(path)
+
+        self.assertEqual(loaded.generator4_single_level_file, "C:/levels/gen4.ldf")
+        self.assertEqual(loaded.generator4_campaign_directory, "C:/levels/gen4camp")
+        self.assertTrue(loaded.generator4_zero_enemy_station_delays)
+        self.assertTrue(loaded.generator4_zero_enemy_radar_budgets)
+
+    def test_generator4_single_workflow_writes_level_and_backup(self) -> None:
+        target = self.tmp_path / "gen4.ldf"
+        target.write_text("old level", encoding="utf-8")
+
+        result = generate_generator4_single(
+            target,
+            seed=2026,
+            campaign_profile="original",
+            level_id=2,
+            zero_enemy_station_delays=True,
+            zero_enemy_radar_budgets=True,
+        )
+
+        self.assertEqual(result.written, target)
+        self.assertEqual(result.level.metadata["generator"], "generator4")
+        self.assertEqual(result.level.metadata["level_archetype"], "L0202")
+        self.assertEqual(result.level.metadata["warnings"], [])
+        self.assertTrue(target.exists())
+        self.assertIsNotNone(result.backup_path)
+        assert result.backup_path is not None
+        self.assertEqual(result.backup_path.read_text(encoding="utf-8"), "old level")
+        self.assertEqual(set(self._radar_budget_values(result.level.text)), {"0"})
+
+    def test_generator4_campaign_workflow_writes_campaign(self) -> None:
+        directory = self.tmp_path / "gen4camp"
+        directory.mkdir()
+
+        result = generate_generator4_campaign(
+            directory,
+            seed=2026,
+            campaign_profile="md-ghorkov",
+        )
+
+        self.assertEqual(result.campaign_profile, "md-ghorkov")
+        self.assertEqual(len(result.written), len(result.campaign.levels))
+        self.assertEqual(len(result.written), 16)
         self.assertTrue(all(path.exists() for path in result.written))
 
     def test_configured_backup_workflow_skips_blanks_and_deduplicates_paths(self) -> None:

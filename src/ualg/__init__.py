@@ -3,6 +3,7 @@
 from .generator1 import Generator1, Generator1CustomOptions
 from .generator2 import Generator2
 from .generator3 import Generator3
+from .generator4 import Generator4
 from .models import GeneratedCampaign, GeneratedLevel
 from .rng import MSVCRTRandom
 
@@ -11,6 +12,7 @@ __all__ = [
     "Generator1CustomOptions",
     "Generator2",
     "Generator3",
+    "Generator4",
     "GeneratedCampaign",
     "GeneratedLevel",
     "MSVCRTRandom",

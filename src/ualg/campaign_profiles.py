@@ -90,7 +90,7 @@ class ProfileRegistry:
 
         profiles_by_generator: dict[str, dict[str, CampaignProfile]] = {}
         for generator, raw_profiles in generators.items():
-            if generator not in {"generator1", "generator2", "generator3"}:
+            if generator not in {"generator1", "generator2", "generator3", "generator4"}:
                 raise ValueError(f"Unsupported campaign profile generator: {generator!r}.")
             if not isinstance(raw_profiles, dict) or not raw_profiles:
                 raise ValueError(f"Generator {generator!r} must define at least one profile.")
@@ -134,7 +134,7 @@ def _build_profile(generator: str, profile_id: str, spec: dict[str, Any]) -> Cam
 
     data_profile = str(spec.get("data_profile", UA_ORIGINAL_PROFILE))
     roster_profile = str(spec.get("roster_profile", data_profile))
-    numeric_faction_generators = {"generator1", "generator3"}
+    numeric_faction_generators = {"generator1", "generator3", "generator4"}
     roster = (
         _build_generator1_roster(roster_profile)
         if generator in numeric_faction_generators

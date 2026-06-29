@@ -11,6 +11,7 @@ sys.path.insert(0, str(SRC))
 from ualg.campaign_profiles import ProfileRegistry, default_profile_registry
 from ualg.generator1 import Generator1
 from ualg.generator2 import Generator2
+from ualg.generator4 import Generator4
 
 
 class CampaignProfileTests(unittest.TestCase):
@@ -19,6 +20,7 @@ class CampaignProfileTests(unittest.TestCase):
 
         self.assertEqual(registry.names("generator1"), ("original", "md-ghorkov", "md-taerkasten"))
         self.assertEqual(registry.names("generator2"), ("original", "md-ghorkov", "md-taerkasten"))
+        self.assertEqual(registry.names("generator4"), ("original", "md-ghorkov", "md-taerkasten"))
         self.assertEqual(registry.get("generator1", "md-ghorkov").level_ids[0], 7)
         self.assertEqual(registry.get("generator2", "original").targets_by_level[1], (2, 3))
 
@@ -79,6 +81,30 @@ class CampaignProfileTests(unittest.TestCase):
 
         self.assertEqual([level.filename for level in campaign.levels], ["L0101.ldf"])
         self.assertIn("Generator: Generator2", campaign.levels[0].text)
+
+    def test_generator4_accepts_injected_profile_registry(self) -> None:
+        registry = ProfileRegistry.from_mapping({
+            "version": 1,
+            "generators": {
+                "generator4": {
+                    "tiny": {
+                        "data_profile": "original",
+                        "roster_profile": "original",
+                        "mission_map_profile": None,
+                        "mission_briefing_default": "MB_02.IFF",
+                        "mission_debriefing_default": "DB_02.IFF",
+                        "player_faction": 1,
+                        "level_filenames": ["l0202.ldf"],
+                        "target_mode": "next",
+                    }
+                }
+            },
+        })
+
+        campaign = Generator4(profile_registry=registry).generate_campaign(seed=1234, campaign_profile="tiny")
+
+        self.assertEqual([level.filename for level in campaign.levels], ["L0202.ldf"])
+        self.assertIn("Generator: Generator4", campaign.levels[0].text)
 
 
 if __name__ == "__main__":

@@ -703,6 +703,8 @@ class CoreTests(unittest.TestCase):
         gen1_md_campaign = ROOT / ".cli_smoke_gen1_md_campaign"
         gen2_output = ROOT / ".cli_smoke_gen2_single.ldf"
         gen2_md_campaign = ROOT / ".cli_smoke_gen2_md_campaign"
+        gen4_output = ROOT / ".cli_smoke_gen4_single.ldf"
+        gen4_md_campaign = ROOT / ".cli_smoke_gen4_md_campaign"
         env = {**os.environ, "PYTHONPATH": str(SRC), "PYTHONDONTWRITEBYTECODE": "1"}
         try:
             result = subprocess.run(
@@ -838,8 +840,64 @@ class CoreTests(unittest.TestCase):
                 len(list(gen2_md_campaign.glob("*.ldf"))),
                 len(GENERATOR2_MD_CAMPAIGN_LEVEL_IDS_BY_PROFILE["md-taerkasten"]),
             )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    "-m",
+                    "ualg.cli",
+                    "gen4",
+                    "single",
+                    "--seed",
+                    "1234",
+                    "--campaign-profile",
+                    "original",
+                    "--level-id",
+                    "2",
+                    "--zero-enemy-station-delays",
+                    "--zero-enemy-radar-budgets",
+                    "--output",
+                    str(gen4_output),
+                ],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(gen4_output.exists())
+            gen4_text = gen4_output.read_text(encoding="utf-8")
+            self.assertIn("Generator: Generator4", gen4_text)
+            self.assertTrue(self._assert_generator2_enemy_station_delays_zero(gen4_text))
+            self.assertTrue(self._assert_enemy_radar_budgets_zero(gen4_text))
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    "-m",
+                    "ualg.cli",
+                    "gen4",
+                    "campaign",
+                    "--seed",
+                    "1234",
+                    "--campaign-profile",
+                    "md-ghorkov",
+                    "--output-dir",
+                    str(gen4_md_campaign),
+                ],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(len(list(gen4_md_campaign.glob("*.ldf"))), 16)
         finally:
-            for output in (gen1_output, gen2_output):
+            for output in (gen1_output, gen2_output, gen4_output):
                 if output.exists():
                     output.unlink()
             if gen1_campaign.exists():
@@ -848,6 +906,8 @@ class CoreTests(unittest.TestCase):
                 shutil.rmtree(gen1_md_campaign)
             if gen2_md_campaign.exists():
                 shutil.rmtree(gen2_md_campaign)
+            if gen4_md_campaign.exists():
+                shutil.rmtree(gen4_md_campaign)
 
     @staticmethod
     def _blocks(text: str, block_name: str) -> list[list[str]]:

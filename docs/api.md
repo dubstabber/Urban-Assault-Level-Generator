@@ -5,16 +5,18 @@ services plus result models. Import from `ualg` for normal use:
 
 ```python
 from ualg import (
-    Generator1,
-    Generator1CustomOptions,
-    Generator2,
-    GeneratedCampaign,
+	    Generator1,
+	    Generator1CustomOptions,
+	    Generator2,
+	    Generator3,
+	    Generator4,
+	    GeneratedCampaign,
     GeneratedLevel,
     MSVCRTRandom,
 )
 ```
 
-Internal modules under `ualg.gen1` and `ualg.gen2` are implementation details.
+Internal modules under `ualg.gen1`, `ualg.gen2`, `ualg.gen3`, and `ualg.gen4` are implementation details.
 The GUI workflow helpers are also not part of the backend API described here.
 
 ## Generator1
@@ -292,6 +294,73 @@ generate_campaign(
 In Remix mode each campaign slot reuses the matching original level as its
 skeleton; in Synthesis mode each slot is generated from scratch. Gate
 progression is rewired to the profile graph in both modes.
+
+## Generator4
+
+`Generator4(profile_registry: ProfileRegistry | None = None)`
+
+Campaign-aware hybrid synthesis. Generator4 uses the baked
+`src/ualg/data/gen4_rules.json` rules dataset to select a campaign slot
+archetype, keeps its size and tileset, synthesizes new WFC terrain, and limits
+enemy rosters, upgrade gems, startup includes, and gate wiring to that slot.
+
+### `generate_single`
+
+```python
+level = Generator4().generate_single(
+    seed=12345,
+    campaign_profile="original",
+    level_id=2,
+)
+```
+
+Signature:
+
+```python
+generate_single(
+    seed: int = 0,
+    *,
+    campaign_profile: str = "original",
+    level_id: int | None = None,
+    zero_enemy_radar_budgets: bool = False,
+    zero_enemy_station_delays: bool = False,
+) -> GeneratedLevel
+```
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `seed` | `0` | Integer RNG seed. `0` uses the current time. |
+| `campaign_profile` | `"original"` | Campaign profile/archetype set: `"original"`, `"md-ghorkov"`, or `"md-taerkasten"`. |
+| `level_id` | `None` | Campaign slot to use as the archetype. When omitted, one slot is chosen from the seed. |
+| `zero_enemy_radar_budgets` | `False` | Set all enemy host station `rad_budget` values to `0`. |
+| `zero_enemy_station_delays` | `False` | Set all enemy host station `*_delay` values to `0`. |
+
+Metadata includes `"generator": "generator4"`, `"level_archetype"`,
+`"source"`, `"tech_phase"`, `"synth_method"`, and `"warnings"`.
+
+### `generate_campaign`
+
+```python
+campaign = Generator4().generate_campaign(
+    seed=12345,
+    campaign_profile="md-ghorkov",
+)
+```
+
+Signature:
+
+```python
+generate_campaign(
+    seed: int = 0,
+    campaign_profile: str = "original",
+    *,
+    zero_enemy_radar_budgets: bool = False,
+    zero_enemy_station_delays: bool = False,
+) -> GeneratedCampaign
+```
+
+Campaign generation emits one synthesized level for every slot in the selected
+profile and rewires beam-gate targets to that profile's campaign graph.
 
 ## Result Models
 

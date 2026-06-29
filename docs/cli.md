@@ -21,9 +21,12 @@ ualg
   gen2
     single
     campaign
-  gen3
-    single
-    campaign
+	  gen3
+	    single
+	    campaign
+	  gen4
+	    single
+	    campaign
 ```
 
 Every command supports `-h` or `--help`.
@@ -163,6 +166,49 @@ ualg gen3 campaign --seed 12345 --campaign-profile original --output-dir out/gen
 | `--output-dir OUTPUT_DIR` | Yes | None | Directory where campaign `.ldf` files are written. The directory is created automatically. |
 
 Built-in profile sizes:
+
+| Profile | Output |
+| --- | --- |
+| `original` | 44-level vanilla campaign. |
+| `md-ghorkov` | 16-level Metropolis Dawn Ghorkov campaign. |
+| `md-taerkasten` | 15-level Metropolis Dawn Taerkasten campaign. |
+
+## Generator4 Single Level
+
+Generate one campaign-aware synthesized level. The selected campaign slot
+controls the tileset, map size, enemy enable pools, upgrade sectors, startup
+tech, and output filename.
+
+```sh
+ualg gen4 single --seed 12345 --campaign-profile original --level-id 2 --output out/L0202.ldf
+```
+
+| Option | Required | Default | Description |
+| --- | --- | --- | --- |
+| `--seed SEED` | No | `0` | Integer RNG seed. `0` uses the current time. |
+| `--campaign-profile {original,md-ghorkov,md-taerkasten}` | No | `original` | Campaign profile/archetype set. |
+| `--level-id ID` | No | None | Campaign slot to use as the archetype. When omitted, one profile slot is chosen from the seed. |
+| `--zero-enemy-radar-budgets` | No | Off | Set all enemy host station `rad_budget` values to `0`. |
+| `--zero-enemy-station-delays` | No | Off | Set all enemy host station `*_delay` values to `0`. |
+| `--output OUTPUT` | Yes | None | Output `.ldf` file path. Parent directories are created automatically. |
+
+## Generator4 Campaign
+
+Generate one campaign-aware synthesized level for every slot in a profile.
+
+```sh
+ualg gen4 campaign --seed 12345 --campaign-profile md-ghorkov --output-dir out/gen4
+```
+
+| Option | Required | Default | Description |
+| --- | --- | --- | --- |
+| `--seed SEED` | No | `0` | Integer RNG seed. `0` uses the current time. |
+| `--campaign-profile {original,md-ghorkov,md-taerkasten}` | No | `original` | Campaign profile/archetype set. |
+| `--zero-enemy-radar-budgets` | No | Off | Set all enemy host station `rad_budget` values to `0`. |
+| `--zero-enemy-station-delays` | No | Off | Set all enemy host station `*_delay` values to `0`. |
+| `--output-dir OUTPUT_DIR` | Yes | None | Directory where campaign `.ldf` files are written. The directory is created automatically. |
+
+Built-in profile sizes match Generator3:
 
 | Profile | Output |
 | --- | --- |

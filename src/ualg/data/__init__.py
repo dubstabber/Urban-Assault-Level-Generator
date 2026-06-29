@@ -36,6 +36,13 @@ def gen3_corpus() -> dict[str, Any]:
 
 
 @cache
+def gen4_rules() -> dict[str, Any]:
+    """Baked campaign-aware rules used by Generator4."""
+
+    return load_json("gen4_rules.json")
+
+
+@cache
 def ua_hoststations(profile: str = UA_ORIGINAL_PROFILE) -> dict[int, dict[str, Any]]:
     raw = ua_data()[profile]["hoststations"]
     return {int(data["owner"]): data for data in raw.values()}
