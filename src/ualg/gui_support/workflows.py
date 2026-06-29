@@ -8,6 +8,7 @@ from pathlib import Path
 
 from ..generator1 import Generator1, Generator1CustomOptions
 from ..generator2 import Generator2
+from ..generator3 import Generator3
 from ..models import GeneratedCampaign, GeneratedLevel
 from .backups import backup_campaign_ldfs, backup_existing_file
 
@@ -126,6 +127,61 @@ def generate_generator2_campaign(
         campaign_profile=campaign_profile,
         zero_enemy_station_delays=zero_enemy_station_delays,
         zero_enemy_radar_budgets=zero_enemy_radar_budgets,
+    )
+    written = campaign.write(target_dir)
+    return CampaignGenerationResult(
+        campaign=campaign,
+        written=written,
+        directory=target_dir,
+        campaign_profile=campaign_profile,
+        backup_dir=backup_dir,
+        moved=moved,
+    )
+
+
+def generate_generator3_single(
+    target: str | Path,
+    *,
+    seed: int,
+    campaign_profile: str,
+    mode: str = "remix",
+    skeleton: str | None = None,
+    level_id: int | None = None,
+    zero_enemy_radar_budgets: bool = False,
+    zero_enemy_station_delays: bool = False,
+) -> LevelGenerationResult:
+    target_path = Path(target)
+    backup_path = backup_existing_file(target_path)
+    level = Generator3().generate_single(
+        seed=seed,
+        campaign_profile=campaign_profile,
+        mode=mode,
+        skeleton=skeleton,
+        level_id=level_id,
+        zero_enemy_radar_budgets=zero_enemy_radar_budgets,
+        zero_enemy_station_delays=zero_enemy_station_delays,
+    )
+    written = level.write(target_path)
+    return LevelGenerationResult(level=level, written=written, backup_path=backup_path)
+
+
+def generate_generator3_campaign(
+    directory: str | Path,
+    *,
+    seed: int,
+    campaign_profile: str,
+    mode: str = "remix",
+    zero_enemy_radar_budgets: bool = False,
+    zero_enemy_station_delays: bool = False,
+) -> CampaignGenerationResult:
+    target_dir = Path(directory)
+    backup_dir, moved = backup_campaign_ldfs(target_dir)
+    campaign = Generator3().generate_campaign(
+        seed=seed,
+        campaign_profile=campaign_profile,
+        mode=mode,
+        zero_enemy_radar_budgets=zero_enemy_radar_budgets,
+        zero_enemy_station_delays=zero_enemy_station_delays,
     )
     written = campaign.write(target_dir)
     return CampaignGenerationResult(

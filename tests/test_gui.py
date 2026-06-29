@@ -25,6 +25,8 @@ from ualg.gui_support.workflows import (
     create_configured_backups,
     generate_generator1_single,
     generate_generator2_campaign,
+    generate_generator3_campaign,
+    generate_generator3_single,
 )
 
 
@@ -75,6 +77,10 @@ class GuiHelperTests(unittest.TestCase):
             generator2_campaign_directory=str(self.tmp_path / "gen2_campaign"),
             generator2_zero_enemy_station_delays=True,
             generator2_zero_enemy_radar_budgets=True,
+            generator3_single_level_file=str(self.tmp_path / "gen3_single.ldf"),
+            generator3_campaign_directory=str(self.tmp_path / "gen3_campaign"),
+            generator3_zero_enemy_station_delays=True,
+            generator3_zero_enemy_radar_budgets=True,
         )
 
         saved = save_settings(settings, path)
@@ -244,6 +250,82 @@ class GuiHelperTests(unittest.TestCase):
         ]
         self.assertTrue(radar_values)
         self.assertEqual(set(radar_values), {"0"})
+
+    def test_load_settings_reads_generator3_paths(self) -> None:
+        path = self.tmp_path / "RandomUA.ini"
+        path.write_text(
+            "\n".join(
+                [
+                    "[Generator3]",
+                    "SingleLevelFile=C:/levels/gen3.ldf",
+                    "CampaignDirectory=C:/levels/gen3camp",
+                    "ZeroEnemyStationDelays=1",
+                    "ZeroEnemyRadarBudgets=1",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        loaded = load_settings(path)
+
+        self.assertEqual(loaded.generator3_single_level_file, "C:/levels/gen3.ldf")
+        self.assertEqual(loaded.generator3_campaign_directory, "C:/levels/gen3camp")
+        self.assertTrue(loaded.generator3_zero_enemy_station_delays)
+        self.assertTrue(loaded.generator3_zero_enemy_radar_budgets)
+
+    def test_generator3_single_remix_workflow_writes_level_and_backup(self) -> None:
+        target = self.tmp_path / "remix.ldf"
+        target.write_text("old level", encoding="utf-8")
+
+        result = generate_generator3_single(
+            target,
+            seed=12345,
+            campaign_profile="original",
+            mode="remix",
+            skeleton="L0101",
+            zero_enemy_radar_budgets=True,
+        )
+
+        self.assertEqual(result.written, target)
+        self.assertEqual(result.level.metadata["mode"], "remix")
+        self.assertEqual(result.level.metadata["skeleton"], "L0101")
+        self.assertTrue(target.exists())
+        self.assertIsNotNone(result.backup_path)
+        assert result.backup_path is not None
+        self.assertEqual(result.backup_path.read_text(encoding="utf-8"), "old level")
+        radar_values = self._radar_budget_values(result.level.text)
+        self.assertTrue(radar_values)
+        self.assertEqual(set(radar_values), {"0"})
+
+    def test_generator3_single_synthesis_workflow(self) -> None:
+        target = self.tmp_path / "synth.ldf"
+
+        result = generate_generator3_single(
+            target,
+            seed=12345,
+            campaign_profile="original",
+            mode="synthesis",
+        )
+
+        self.assertEqual(result.level.metadata["mode"], "synthesis")
+        self.assertIn(result.level.metadata["synth_method"], ("wfc", "scanline"))
+        self.assertTrue(target.exists())
+
+    def test_generator3_campaign_workflow_writes_campaign(self) -> None:
+        directory = self.tmp_path / "gen3camp"
+        directory.mkdir()
+
+        result = generate_generator3_campaign(
+            directory,
+            seed=2026,
+            campaign_profile="md-ghorkov",
+            mode="remix",
+        )
+
+        self.assertEqual(result.campaign_profile, "md-ghorkov")
+        self.assertEqual(len(result.written), len(result.campaign.levels))
+        self.assertTrue(result.written)
+        self.assertTrue(all(path.exists() for path in result.written))
 
     def test_configured_backup_workflow_skips_blanks_and_deduplicates_paths(self) -> None:
         single = self.tmp_path / "single.ldf"

@@ -13,6 +13,7 @@ from ..constants import (
     GENERATOR1_CAMPAIGN_PROFILES,
     GENERATOR2_CAMPAIGN_PROFILES,
     GENERATOR2_LEVELS,
+    GENERATOR3_CAMPAIGN_PROFILES,
     level_filename,
 )
 from ..generator1 import Generator1CustomOptions
@@ -39,10 +40,17 @@ from .workflows import (
     generate_generator1_single,
     generate_generator2_campaign,
     generate_generator2_single,
+    generate_generator3_campaign,
+    generate_generator3_single,
 )
 
 
 APP_TITLE = "Urban Assault Level Generator"
+GENERATOR3_MODES = ("remix", "synthesis")
+GENERATOR3_MODE_TOOLTIP = (
+    "Remix reuses a real hand-made level's terrain and balance, swapping factions and rosters. "
+    "Synthesis generates brand-new Wave Function Collapse terrain learned from the original levels."
+)
 ENEMY_RADAR_BUDGET_TOOLTIP = (
     "Prevents enemy AI from spending budget on radar stations. This keeps host stations from roaming away from "
     "their bases, where nearby squads could destroy them."
@@ -126,6 +134,21 @@ class Generator1GUI:
         self.generator2_zero_enemy_radar_budgets_var = tk.BooleanVar(
             value=settings.generator2_zero_enemy_radar_budgets
         )
+        self.generator3_single_file_var = tk.StringVar(value=settings.generator3_single_level_file)
+        self.generator3_campaign_dir_var = tk.StringVar(value=settings.generator3_campaign_directory)
+        self.generator3_seed_var = tk.StringVar(value="")
+        self.generator3_campaign_seed_var = tk.StringVar(value="")
+        self.generator3_single_profile_var = tk.StringVar(value="original")
+        self.generator3_campaign_profile_var = tk.StringVar(value="original")
+        self.generator3_single_mode_var = tk.StringVar(value="remix")
+        self.generator3_campaign_mode_var = tk.StringVar(value="remix")
+        self.generator3_skeleton_var = tk.StringVar(value="")
+        self.generator3_zero_enemy_station_delays_var = tk.BooleanVar(
+            value=settings.generator3_zero_enemy_station_delays
+        )
+        self.generator3_zero_enemy_radar_budgets_var = tk.BooleanVar(
+            value=settings.generator3_zero_enemy_radar_budgets
+        )
         self.building_scripts_var = tk.BooleanVar(value=settings.use_building_scripts)
         self.status_var = tk.StringVar(value="Ready.")
         self.tooltips: list[ToolTip] = []
@@ -143,10 +166,13 @@ class Generator1GUI:
 
         generator1_tab = tk.Frame(notebook, padx=8, pady=8)
         generator2_tab = tk.Frame(notebook, padx=8, pady=8)
+        generator3_tab = tk.Frame(notebook, padx=8, pady=8)
         notebook.add(generator1_tab, text="Generator1")
         notebook.add(generator2_tab, text="Generator2")
+        notebook.add(generator3_tab, text="Generator3")
         self._build_generator1_tab(generator1_tab)
         self._build_generator2_tab(generator2_tab)
+        self._build_generator3_tab(generator3_tab)
 
         bottom = tk.Frame(outer)
         bottom.grid(row=1, column=0, sticky="ew", pady=(8, 0))
@@ -325,6 +351,122 @@ class Generator1GUI:
             self._browse_generator2_campaign_dir,
         )
         tk.Button(campaign, text="Generate Campaign", command=self._make_generator2_campaign).grid(
+            row=6, column=0, columnspan=2, sticky="ew", pady=(8, 0)
+        )
+
+    def _build_generator3_tab(self, outer: tk.Frame) -> None:
+        outer.columnconfigure(0, weight=1)
+
+        intro = tk.Label(
+            outer,
+            text="Generator3 builds authored-style levels from the original game levels.",
+            justify="left",
+            anchor="w",
+        )
+        intro.grid(row=0, column=0, sticky="ew")
+
+        options = tk.LabelFrame(outer, text="Options", padx=8, pady=8)
+        options.grid(row=1, column=0, sticky="ew", pady=(6, 0))
+        tk.Checkbutton(
+            options,
+            text="Set enemy host station delays to 0",
+            variable=self.generator3_zero_enemy_station_delays_var,
+        ).grid(row=0, column=0, sticky="w")
+        radar_check = tk.Checkbutton(
+            options,
+            text="Disable enemy radar budgets",
+            variable=self.generator3_zero_enemy_radar_budgets_var,
+        )
+        radar_check.grid(row=1, column=0, sticky="w")
+        self._add_tooltip(radar_check, ENEMY_RADAR_BUDGET_TOOLTIP)
+
+        single = tk.LabelFrame(outer, text="Single Level", padx=8, pady=8)
+        single.grid(row=2, column=0, sticky="ew", pady=(8, 0))
+        single.columnconfigure(1, weight=1)
+
+        tk.Label(single, text="Mode:", anchor="w").grid(row=0, column=0, sticky="w", padx=(0, 6), pady=2)
+        single_mode = ttk.Combobox(
+            single,
+            textvariable=self.generator3_single_mode_var,
+            values=list(GENERATOR3_MODES),
+            state="readonly",
+            width=12,
+        )
+        single_mode.grid(row=0, column=1, sticky="w", pady=2)
+        self._add_tooltip(single_mode, GENERATOR3_MODE_TOOLTIP)
+
+        tk.Label(single, text="Campaign profile (rosters):", anchor="w").grid(
+            row=1, column=0, sticky="w", padx=(0, 6), pady=2
+        )
+        ttk.Combobox(
+            single,
+            textvariable=self.generator3_single_profile_var,
+            values=list(GENERATOR3_CAMPAIGN_PROFILES),
+            state="readonly",
+            width=16,
+        ).grid(row=1, column=1, sticky="w", pady=2)
+
+        tk.Label(single, text="Skeleton (remix, optional e.g. L1515):", anchor="w").grid(
+            row=2, column=0, sticky="w", padx=(0, 6), pady=2
+        )
+        tk.Entry(single, textvariable=self.generator3_skeleton_var, width=18).grid(row=2, column=1, sticky="w", pady=2)
+
+        tk.Label(single, text="Seed (blank for random):", anchor="w").grid(
+            row=3, column=0, sticky="w", padx=(0, 6), pady=2
+        )
+        tk.Entry(single, textvariable=self.generator3_seed_var, width=18).grid(row=3, column=1, sticky="w", pady=2)
+
+        self._path_row(
+            single,
+            2,
+            "Single level output file:",
+            self.generator3_single_file_var,
+            self._browse_generator3_single_file,
+        )
+        tk.Button(single, text="Generate Single Level", command=self._make_generator3_single).grid(
+            row=6, column=0, columnspan=2, sticky="ew", pady=(8, 0)
+        )
+
+        campaign = tk.LabelFrame(outer, text="Campaign", padx=8, pady=8)
+        campaign.grid(row=3, column=0, sticky="ew", pady=(8, 0))
+        campaign.columnconfigure(1, weight=1)
+
+        tk.Label(campaign, text="Mode:", anchor="w").grid(row=0, column=0, sticky="w", padx=(0, 6), pady=2)
+        campaign_mode = ttk.Combobox(
+            campaign,
+            textvariable=self.generator3_campaign_mode_var,
+            values=list(GENERATOR3_MODES),
+            state="readonly",
+            width=12,
+        )
+        campaign_mode.grid(row=0, column=1, sticky="w", pady=2)
+        self._add_tooltip(campaign_mode, GENERATOR3_MODE_TOOLTIP)
+
+        tk.Label(campaign, text="Campaign profile:", anchor="w").grid(
+            row=1, column=0, sticky="w", padx=(0, 6), pady=2
+        )
+        ttk.Combobox(
+            campaign,
+            textvariable=self.generator3_campaign_profile_var,
+            values=list(GENERATOR3_CAMPAIGN_PROFILES),
+            state="readonly",
+            width=16,
+        ).grid(row=1, column=1, sticky="w", pady=2)
+
+        tk.Label(campaign, text="Seed (blank for random):", anchor="w").grid(
+            row=2, column=0, sticky="w", padx=(0, 6), pady=2
+        )
+        tk.Entry(campaign, textvariable=self.generator3_campaign_seed_var, width=18).grid(
+            row=2, column=1, sticky="w", pady=2
+        )
+        self._path_row(
+            campaign,
+            2,
+            "Campaign output folder:",
+            self.generator3_campaign_dir_var,
+            self._browse_generator3_campaign_dir,
+        )
+        tk.Button(campaign, text="Generate Campaign", command=self._make_generator3_campaign).grid(
             row=6, column=0, columnspan=2, sticky="ew", pady=(8, 0)
         )
 
@@ -632,10 +774,143 @@ class Generator1GUI:
             success_lines=lambda result: self._campaign_created_lines(result, "Generator2"),
         )
 
+    def _make_generator3_single(self) -> None:
+        seed = self._parse_optional_seed_entry(self.generator3_seed_var, "Generator3 Single Level")
+        if seed is None:
+            return
+        target = self._ensure_file_path(
+            self.generator3_single_file_var,
+            "Select Generator3 single level output file",
+        )
+        if target is None:
+            return
+        self._generate_generator3_single(
+            target,
+            seed=seed,
+            campaign_profile=self.generator3_single_profile_var.get().strip() or "original",
+            mode=self.generator3_single_mode_var.get().strip() or "remix",
+            skeleton=self.generator3_skeleton_var.get().strip() or None,
+            zero_enemy_station_delays=self.generator3_zero_enemy_station_delays_var.get(),
+            zero_enemy_radar_budgets=self.generator3_zero_enemy_radar_budgets_var.get(),
+        )
+
+    def _make_generator3_campaign(self) -> None:
+        seed = self._parse_optional_seed_entry(self.generator3_campaign_seed_var, "Generator3 Campaign")
+        if seed is None:
+            return
+        directory = self._ensure_directory_path(
+            self.generator3_campaign_dir_var, "Select Generator3 campaign output folder"
+        )
+        if directory is None:
+            return
+        self._generate_generator3_campaign(
+            directory,
+            seed=seed,
+            campaign_profile=self.generator3_campaign_profile_var.get().strip() or "original",
+            mode=self.generator3_campaign_mode_var.get().strip() or "remix",
+            zero_enemy_station_delays=self.generator3_zero_enemy_station_delays_var.get(),
+            zero_enemy_radar_budgets=self.generator3_zero_enemy_radar_budgets_var.get(),
+        )
+
+    def _generate_generator3_single(
+        self,
+        target: Path,
+        *,
+        seed: int,
+        campaign_profile: str,
+        mode: str,
+        skeleton: str | None,
+        zero_enemy_station_delays: bool,
+        zero_enemy_radar_budgets: bool,
+    ) -> None:
+        self._run_generation_workflow(
+            start_status="Generating Generator3 level...",
+            failure_status="Generator3 generation failed.",
+            error_title="Generation Failed",
+            success_title="Generator3 Level Created",
+            action=lambda: generate_generator3_single(
+                target,
+                seed=seed,
+                campaign_profile=campaign_profile,
+                mode=mode,
+                skeleton=skeleton,
+                zero_enemy_radar_budgets=zero_enemy_radar_budgets,
+                zero_enemy_station_delays=zero_enemy_station_delays,
+            ),
+            success_status=lambda result: f"Wrote {result.written}",
+            success_lines=self._generator3_level_created_lines,
+        )
+
+    def _generate_generator3_campaign(
+        self,
+        directory: Path,
+        *,
+        seed: int,
+        campaign_profile: str,
+        mode: str,
+        zero_enemy_station_delays: bool,
+        zero_enemy_radar_budgets: bool,
+    ) -> None:
+        self._run_generation_workflow(
+            start_status="Generating Generator3 campaign...",
+            failure_status="Generator3 campaign generation failed.",
+            error_title="Campaign Generation Failed",
+            success_title="Generator3 Campaign Created",
+            action=lambda: generate_generator3_campaign(
+                directory,
+                seed=seed,
+                campaign_profile=campaign_profile,
+                mode=mode,
+                zero_enemy_radar_budgets=zero_enemy_radar_budgets,
+                zero_enemy_station_delays=zero_enemy_station_delays,
+            ),
+            success_status=lambda result: f"Wrote {len(result.written)} Generator3 campaign levels.",
+            success_lines=lambda result: self._campaign_created_lines(result, "Generator3"),
+        )
+
+    def _generator3_level_created_lines(self, result: LevelGenerationResult) -> list[str]:
+        level = result.level
+        metadata = level.metadata
+        origin = metadata.get("skeleton") or f"synthesized ({metadata.get('synth_method')})"
+        lines = [
+            f"Wrote {result.written}",
+            f"Mode: {metadata.get('mode')}",
+            f"Source: {origin}",
+            f"Seed: {level.seed}",
+            f"Map: {level.width}x{level.height}",
+            f"Tileset: {level.tileset}",
+        ]
+        if result.backup_path is not None:
+            lines.append(f"Backup: {result.backup_path}")
+        return lines
+
+    def _browse_generator3_single_file(self) -> None:
+        path = self._ask_save_file(
+            "Select Generator3 single level output file",
+            self.generator3_single_file_var.get(),
+            "level_01.ldf",
+        )
+        if path is not None:
+            self.generator3_single_file_var.set(str(path))
+
+    def _browse_generator3_campaign_dir(self) -> None:
+        path = self._ask_directory("Select Generator3 campaign output folder", self.generator3_campaign_dir_var.get())
+        if path is not None:
+            self.generator3_campaign_dir_var.set(str(path))
+
     def _create_backup(self) -> None:
         result = create_configured_backups(
-            (self.random_file_var.get(), self.custom_file_var.get(), self.generator2_single_file_var.get()),
-            (self.campaign_dir_var.get(), self.generator2_campaign_dir_var.get()),
+            (
+                self.random_file_var.get(),
+                self.custom_file_var.get(),
+                self.generator2_single_file_var.get(),
+                self.generator3_single_file_var.get(),
+            ),
+            (
+                self.campaign_dir_var.get(),
+                self.generator2_campaign_dir_var.get(),
+                self.generator3_campaign_dir_var.get(),
+            ),
         )
         if not result.created:
             self._set_status("No existing generated files found to back up.")
@@ -852,6 +1127,10 @@ class Generator1GUI:
             generator2_campaign_directory=self.generator2_campaign_dir_var.get().strip(),
             generator2_zero_enemy_station_delays=self.generator2_zero_enemy_station_delays_var.get(),
             generator2_zero_enemy_radar_budgets=self.generator2_zero_enemy_radar_budgets_var.get(),
+            generator3_single_level_file=self.generator3_single_file_var.get().strip(),
+            generator3_campaign_directory=self.generator3_campaign_dir_var.get().strip(),
+            generator3_zero_enemy_station_delays=self.generator3_zero_enemy_station_delays_var.get(),
+            generator3_zero_enemy_radar_budgets=self.generator3_zero_enemy_radar_budgets_var.get(),
         )
 
     def _show_credits(self) -> None:

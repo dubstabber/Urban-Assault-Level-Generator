@@ -52,7 +52,7 @@ $env:PYTHONPATH = "src"
 python -m ualg.gui
 ```
 
-When installed as a package, the GUI command is `ualg-gui`. The GUI includes tabs for Generator1 and Generator2 generation workflows.
+When installed as a package, the GUI command is `ualg-gui`. The GUI includes tabs for Generator1, Generator2, and Generator3 generation workflows. The Generator3 tab has a Remix/Synthesis mode selector for both single levels and campaigns.
 
 Double-click launchers:
 
