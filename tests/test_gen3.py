@@ -244,6 +244,26 @@ class RemixTests(unittest.TestCase):
             self.assertEqual((width, height), (level.width, level.height))
             self.assertEqual(len(rows), height)
 
+    def test_output_uses_creator_style_sections(self) -> None:
+        level = self.generator.generate_single(seed=1, campaign_profile="md-ghorkov", skeleton="L0202")
+        text = level.text.replace("\r\n", "\n")
+        for title in (
+            "Main Level Info",
+            "Mission Briefing Maps",
+            "Beam Gates",
+            "Robo Definitions",
+            "Superitems",
+            "Predefined Squads",
+            "Prototype Modifications",
+            "Prototype Enabling",
+            "Tech Upgrades",
+            "Map Dumps",
+            "End Of File",
+        ):
+            self.assertIn(f";--- {title}", text)
+        self.assertIn(";--- map dumps end here ---", text)
+        self.assertRegex(text, r"\n\tbegin_action\n\t\tmodify_vehicle")
+
     def test_zero_radar_budgets(self) -> None:
         level = self.generator.generate_single(
             seed=7, campaign_profile="original", skeleton="L0101", zero_enemy_radar_budgets=True

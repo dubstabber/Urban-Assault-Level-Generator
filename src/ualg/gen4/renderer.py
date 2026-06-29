@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..constants import FACTION_NAMES
-from ..ldf import LDFWriter
+from ..ldf import LDFWriter, format_gem_block
 from .context import _Gen4Level
 
 _PALETTE_SLOTS = ["standard", "red", "blau", "gruen", "inverse", "invdark", "sw", "invtuerk"]
@@ -25,11 +25,11 @@ class Generator4Renderer:
         self._write_briefing_maps(writer, level)
         self._write_gates(writer, level)
         self._write_robos(writer, level)
+        self._write_items(writer, level)
         self._write_squads(writer, level)
         self._write_prototype(writer, level)
         self._write_enables(writer, level)
         self._write_gems(writer, level)
-        self._write_items(writer, level)
         self._write_maps(writer, level)
         return writer.getvalue()
 
@@ -46,6 +46,8 @@ class Generator4Renderer:
         writer.line(f";--- Profile: {level.profile_id}")
         writer.line(f";--- Map Size: {level.width}x{level.height}  Tileset: {level.tileset}")
         writer.line(";------------------------------------------------------------")
+        writer.line("")
+        writer.section("Main Level Info")
         writer.begin_block("begin_level")
         writer.property("set", level.tileset)
         writer.property("sky", level.sky)
@@ -59,6 +61,7 @@ class Generator4Renderer:
         writer.line("")
 
     def _write_briefing_maps(self, writer: LDFWriter, level: _Gen4Level) -> None:
+        writer.section("Mission Briefing Maps")
         writer.begin_block("begin_mbmap")
         writer.property("name", level.mission_briefing_map)
         self._write_map_size(writer, level.mbmap_block)
@@ -76,6 +79,11 @@ class Generator4Renderer:
                 writer.property(key, block[key])
 
     def _write_gates(self, writer: LDFWriter, level: _Gen4Level) -> None:
+        writer.section("Beam Gates")
+        if not level.gates:
+            writer.none()
+            writer.line("")
+            return
         for gate in level.gates:
             writer.begin_block("begin_gate")
             writer.property("sec_x", gate["sec_x"])
@@ -93,6 +101,11 @@ class Generator4Renderer:
             writer.line("")
 
     def _write_robos(self, writer: LDFWriter, level: _Gen4Level) -> None:
+        writer.section("Robo Definitions")
+        if not level.robos:
+            writer.none()
+            writer.line("")
+            return
         for robo in level.robos:
             owner = robo.get("owner")
             writer.line(f"; Host Station ({FACTION_NAMES.get(int(owner), owner)})")
@@ -103,7 +116,29 @@ class Generator4Renderer:
             writer.end_block()
             writer.line("")
 
+    def _write_items(self, writer: LDFWriter, level: _Gen4Level) -> None:
+        writer.section("Superitems")
+        if not level.items:
+            writer.none()
+            writer.line("")
+            return
+        for item in level.items:
+            writer.begin_block("begin_item")
+            for key in ("sec_x", "sec_y", "inactive_bp", "active_bp", "trigger_bp", "type", "countdown"):
+                if item.get(key) is not None:
+                    writer.property(key, item[key])
+            for key in item.get("keysecs", []):
+                writer.property("keysec_x", key["x"])
+                writer.property("keysec_y", key["y"])
+            writer.end_block()
+            writer.line("")
+
     def _write_squads(self, writer: LDFWriter, level: _Gen4Level) -> None:
+        writer.section("Predefined Squads")
+        if not level.squads:
+            writer.none()
+            writer.line("")
+            return
         for squad in level.squads:
             writer.begin_block("begin_squad")
             writer.property("owner", squad["owner"])
@@ -119,11 +154,21 @@ class Generator4Renderer:
         writer.line("")
 
     def _write_prototype(self, writer: LDFWriter, level: _Gen4Level) -> None:
+        writer.section("Prototype Modifications")
+        if not level.prototype:
+            writer.none()
+            writer.line("")
+            return
         for line in level.prototype:
             writer.line(line)
         writer.line("")
 
     def _write_enables(self, writer: LDFWriter, level: _Gen4Level) -> None:
+        writer.section("Prototype Enabling")
+        if not level.enables:
+            writer.none()
+            writer.line("")
+            return
         for enable in level.enables:
             writer.begin_block(f"begin_enable {enable['owner']}")
             for vehicle in enable.get("vehicles", []):
@@ -134,25 +179,22 @@ class Generator4Renderer:
             writer.line("")
 
     def _write_gems(self, writer: LDFWriter, level: _Gen4Level) -> None:
+        writer.section("Tech Upgrades")
+        if not level.gems:
+            writer.none()
+            writer.line("")
+            return
         for gem in level.gems:
-            for line in gem:
+            for line in format_gem_block(gem):
                 writer.line(line)
             writer.line("")
 
-    def _write_items(self, writer: LDFWriter, level: _Gen4Level) -> None:
-        for item in level.items:
-            writer.begin_block("begin_item")
-            for key in ("sec_x", "sec_y", "inactive_bp", "active_bp", "trigger_bp", "type", "countdown"):
-                if item.get(key) is not None:
-                    writer.property(key, item[key])
-            for key in item.get("keysecs", []):
-                writer.property("keysec_x", key["x"])
-                writer.property("keysec_y", key["y"])
-            writer.end_block()
-            writer.line("")
-
     def _write_maps(self, writer: LDFWriter, level: _Gen4Level) -> None:
+        writer.section("Map Dumps")
         writer.begin_block("begin_maps")
         for name in ("typ", "own", "hgt", "blg"):
             writer.map_block(f"{name}_map", level.maps[name], level.width, level.height)
+        writer.maps_end_comment()
         writer.end_block()
+        writer.line("")
+        writer.end_file_comment()

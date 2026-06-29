@@ -252,6 +252,27 @@ class GenerationTests(unittest.TestCase):
             self.assertEqual((width, height), (level.width, level.height))
             self.assertEqual(len(rows), height)
 
+    def test_output_uses_creator_style_sections(self) -> None:
+        level = self.generator.generate_single(seed=2026, campaign_profile="md-ghorkov", level_id=19)
+        text = level.text.replace("\r\n", "\n")
+        for title in (
+            "Main Level Info",
+            "Mission Briefing Maps",
+            "Beam Gates",
+            "Robo Definitions",
+            "Superitems",
+            "Predefined Squads",
+            "Prototype Modifications",
+            "Prototype Enabling",
+            "Tech Upgrades",
+            "Map Dumps",
+            "End Of File",
+        ):
+            self.assertIn(f";--- {title}", text)
+        self.assertIn(";none", text)
+        self.assertIn(";--- map dumps end here ---", text)
+        self.assertRegex(text, r"\n\tbegin_action\n\t\tmodify_building 52\n\t\t\tenable\s+=\s+6\n\t\tend\n\tend_action\nend")
+
     def test_enemy_enables_are_source_subsets_and_squads_are_legal(self) -> None:
         level = self.generator.generate_single(seed=7, campaign_profile="md-taerkasten", level_id=78)
         parsed = parse_ldf(level.text)

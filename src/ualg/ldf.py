@@ -33,6 +33,22 @@ class LDFWriter:
     def end_block(self) -> None:
         self.line("end")
 
+    def section(self, title: str) -> None:
+        self.line(";------------------------------------------------------------")
+        self.line(f";--- {title:<52}---")
+        self.line(";------------------------------------------------------------")
+
+    def none(self) -> None:
+        self.line(";none")
+
+    def maps_end_comment(self) -> None:
+        self.line("; ------------------------ ")
+        self.line(";--- map dumps end here ---")
+        self.line("; ------------------------ ")
+
+    def end_file_comment(self) -> None:
+        self.section("End Of File")
+
     def map_block(self, map_name: str, rows: MapRows, width: int, height: int, php_style: bool = False) -> None:
         if php_style:
             self.line(f"  {map_name} =")
@@ -99,6 +115,48 @@ def canonicalize_gem_block(lines: list[str]) -> list[str]:
         stack.pop()
         result.append(deferred_gem_ends.pop(0))
 
+    return result
+
+
+def format_gem_block(lines: list[str]) -> list[str]:
+    """Return a readable, consistently indented gem block."""
+
+    result: list[str] = []
+    stack: list[str] = []
+    for line in canonicalize_gem_block(lines):
+        stripped = line.strip()
+        head = _head_without_comment(stripped)
+        if not stripped:
+            result.append("")
+        elif head == "begin_gem":
+            stack.append("gem")
+            result.append(stripped)
+        elif head == "begin_action":
+            stack.append("action")
+            result.append(f"\t{stripped}")
+        elif head.startswith("modify_"):
+            if stack and stack[-1] == "modify":
+                stack.pop()
+            stack.append("modify")
+            result.append(f"\t\t{stripped}")
+        elif head == "end":
+            if stack and stack[-1] == "modify":
+                stack.pop()
+                result.append(f"\t\t{stripped}")
+            else:
+                if stack and stack[-1] == "gem":
+                    stack.pop()
+                result.append(stripped)
+        elif head == "end_action":
+            if stack and stack[-1] == "action":
+                stack.pop()
+            result.append(f"\t{stripped}")
+        elif stack and stack[-1] == "modify":
+            result.append(f"\t\t\t{stripped}")
+        elif stack:
+            result.append(f"\t{stripped}")
+        else:
+            result.append(stripped)
     return result
 
 
