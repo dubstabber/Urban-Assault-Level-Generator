@@ -29,6 +29,13 @@ def ua_data() -> dict[str, Any]:
 
 
 @cache
+def gen3_corpus() -> dict[str, Any]:
+    """Baked dataset of parsed original levels used by Generator3 (Remix)."""
+
+    return load_json("gen3_corpus.json")
+
+
+@cache
 def ua_hoststations(profile: str = UA_ORIGINAL_PROFILE) -> dict[int, dict[str, Any]]:
     raw = ua_data()[profile]["hoststations"]
     return {int(data["owner"]): data for data in raw.values()}

@@ -4,6 +4,7 @@ The public backend API is intentionally small:
 
 - `ualg.generator1.Generator1`
 - `ualg.generator2.Generator2`
+- `ualg.generator3.Generator3`
 - `GeneratedLevel` and `GeneratedCampaign`
 
 CLI and GUI code should keep using those entrypoints. Generator internals are composed from explicit collaborators instead of inherited mixins.
@@ -14,7 +15,9 @@ Generator1 resolves a campaign profile, applies scenario/custom options, builds 
 
 Generator2 resolves a campaign profile, chooses layout, places gates/stations/bombs/squads, builds maps, applies special map rules, then serializes LDF text.
 
-The service classes are orchestration only. Profile lookup, scenario policy, placement, map construction, and rendering each live in focused classes under `ualg.gen1` or `ualg.gen2`.
+Generator3 (Remix) resolves a campaign profile, selects a skeleton from the baked original-level corpus, copies its terrain maps, relabels ownership/buildings through a seeded faction remap, swaps host/squad identities and rosters while preserving authored balance numbers, then serializes LDF text. Its modules live under `ualg.gen3` (`ldf_reader`, `corpus`, `corpus_builder`, `profiles`, `placement`, `remix`, `renderer`, `validate`, `service`). The skeleton corpus (`src/ualg/data/gen3_corpus.json`) is a gitignored local build artifact derived from the original levels: `tools/build_gen3_corpus.py` writes it, and `corpus.py` auto-builds it on demand via `corpus_builder.build_corpus()` in a source checkout.
+
+The service classes are orchestration only. Profile lookup, scenario policy, placement, map construction, and rendering each live in focused classes under `ualg.gen1`, `ualg.gen2`, or `ualg.gen3`.
 
 ## Campaign Profiles
 

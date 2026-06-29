@@ -5,9 +5,14 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .constants import GENERATOR1_CAMPAIGN_PROFILES, GENERATOR2_CAMPAIGN_PROFILES
+from .constants import (
+    GENERATOR1_CAMPAIGN_PROFILES,
+    GENERATOR2_CAMPAIGN_PROFILES,
+    GENERATOR3_CAMPAIGN_PROFILES,
+)
 from .generator1 import Generator1
 from .generator2 import Generator2
+from .generator3 import Generator3
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -80,6 +85,49 @@ def build_parser() -> argparse.ArgumentParser:
     )
     gen2_campaign.add_argument("--output-dir", required=True)
 
+    gen3 = subparsers.add_parser("gen3", help="Corpus-driven authored-style Generator3 (Remix)")
+    gen3_sub = gen3.add_subparsers(dest="mode", required=True)
+    gen3_single = gen3_sub.add_parser("single", help="Remix one authored level")
+    gen3_single.add_argument("--seed", type=int, default=0)
+    gen3_single.add_argument(
+        "--campaign-profile",
+        choices=GENERATOR3_CAMPAIGN_PROFILES,
+        default="original",
+        help="Generator3 roster/profile to remix with",
+    )
+    gen3_single.add_argument("--skeleton", default=None, help="Force a source level, e.g. L1515")
+    gen3_single.add_argument("--level-id", type=int, default=None, help="Use the original level with this id as skeleton")
+    gen3_single.add_argument(
+        "--zero-enemy-radar-budgets",
+        action="store_true",
+        help="Set all enemy host station rad_budget values to 0",
+    )
+    gen3_single.add_argument(
+        "--zero-enemy-station-delays",
+        action="store_true",
+        help="Set all enemy host station *_delay values to 0",
+    )
+    gen3_single.add_argument("--output", required=True)
+    gen3_campaign = gen3_sub.add_parser("campaign", help="Remix a full authored campaign")
+    gen3_campaign.add_argument("--seed", type=int, default=0)
+    gen3_campaign.add_argument(
+        "--campaign-profile",
+        choices=GENERATOR3_CAMPAIGN_PROFILES,
+        default="original",
+        help="Generator3 roster/profile to remix with",
+    )
+    gen3_campaign.add_argument(
+        "--zero-enemy-radar-budgets",
+        action="store_true",
+        help="Set all enemy host station rad_budget values to 0",
+    )
+    gen3_campaign.add_argument(
+        "--zero-enemy-station-delays",
+        action="store_true",
+        help="Set all enemy host station *_delay values to 0",
+    )
+    gen3_campaign.add_argument("--output-dir", required=True)
+
     return parser
 
 
@@ -110,25 +158,49 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Wrote {len(written)} Generator1 levels to {Path(args.output_dir)}")
         return 0
 
-    generator = Generator2()
-    if args.mode == "single":
-        level = generator.generate_single(
+    if args.generator == "gen2":
+        generator = Generator2()
+        if args.mode == "single":
+            level = generator.generate_single(
+                seed=args.seed,
+                level_id=args.level_id,
+                zero_enemy_station_delays=args.zero_enemy_station_delays,
+                zero_enemy_radar_budgets=args.zero_enemy_radar_budgets,
+            )
+            path = level.write(args.output)
+            print(f"Wrote {path}")
+            return 0
+        campaign = generator.generate_campaign(
             seed=args.seed,
-            level_id=args.level_id,
+            campaign_profile=args.campaign_profile,
             zero_enemy_station_delays=args.zero_enemy_station_delays,
             zero_enemy_radar_budgets=args.zero_enemy_radar_budgets,
         )
+        written = campaign.write(args.output_dir)
+        print(f"Wrote {len(written)} Generator2 levels to {Path(args.output_dir)}")
+        return 0
+
+    generator = Generator3()
+    if args.mode == "single":
+        level = generator.generate_single(
+            seed=args.seed,
+            campaign_profile=args.campaign_profile,
+            skeleton=args.skeleton,
+            level_id=args.level_id,
+            zero_enemy_radar_budgets=args.zero_enemy_radar_budgets,
+            zero_enemy_station_delays=args.zero_enemy_station_delays,
+        )
         path = level.write(args.output)
-        print(f"Wrote {path}")
+        print(f"Wrote {path} (remix of {level.metadata['skeleton']})")
         return 0
     campaign = generator.generate_campaign(
         seed=args.seed,
         campaign_profile=args.campaign_profile,
-        zero_enemy_station_delays=args.zero_enemy_station_delays,
         zero_enemy_radar_budgets=args.zero_enemy_radar_budgets,
+        zero_enemy_station_delays=args.zero_enemy_station_delays,
     )
     written = campaign.write(args.output_dir)
-    print(f"Wrote {len(written)} Generator2 levels to {Path(args.output_dir)}")
+    print(f"Wrote {len(written)} Generator3 levels to {Path(args.output_dir)}")
     return 0
 
 

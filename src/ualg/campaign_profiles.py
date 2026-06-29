@@ -90,7 +90,7 @@ class ProfileRegistry:
 
         profiles_by_generator: dict[str, dict[str, CampaignProfile]] = {}
         for generator, raw_profiles in generators.items():
-            if generator not in {"generator1", "generator2"}:
+            if generator not in {"generator1", "generator2", "generator3"}:
                 raise ValueError(f"Unsupported campaign profile generator: {generator!r}.")
             if not isinstance(raw_profiles, dict) or not raw_profiles:
                 raise ValueError(f"Generator {generator!r} must define at least one profile.")
@@ -134,7 +134,12 @@ def _build_profile(generator: str, profile_id: str, spec: dict[str, Any]) -> Cam
 
     data_profile = str(spec.get("data_profile", UA_ORIGINAL_PROFILE))
     roster_profile = str(spec.get("roster_profile", data_profile))
-    roster = _build_generator1_roster(roster_profile) if generator == "generator1" else _build_generator2_roster(spec, roster_profile)
+    numeric_faction_generators = {"generator1", "generator3"}
+    roster = (
+        _build_generator1_roster(roster_profile)
+        if generator in numeric_faction_generators
+        else _build_generator2_roster(spec, roster_profile)
+    )
     player_faction = spec.get("player_faction")
     if player_faction is None:
         raise ValueError(f"Profile {generator}/{profile_id} must define player_faction.")
@@ -152,7 +157,7 @@ def _build_profile(generator: str, profile_id: str, spec: dict[str, Any]) -> Cam
         mission_debriefing_uses_briefing=bool(spec.get("mission_debriefing_uses_briefing", False)),
         mission_briefing_default=str(spec.get("mission_briefing_default", "")),
         mission_debriefing_default=str(spec.get("mission_debriefing_default", "")),
-        player_faction=int(player_faction) if generator == "generator1" else str(player_faction),
+        player_faction=int(player_faction) if generator in numeric_faction_generators else str(player_faction),
         player_vehicle=player_vehicle,
         level_ids=level_ids,
         filenames=filenames,

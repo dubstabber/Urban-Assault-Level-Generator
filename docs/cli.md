@@ -21,6 +21,9 @@ ualg
   gen2
     single
     campaign
+  gen3
+    single
+    campaign
 ```
 
 Every command supports `-h` or `--help`.
@@ -116,6 +119,52 @@ Built-in profile sizes:
 | `original` | 42-level original Generator2 campaign. |
 | `md-ghorkov` | 16-level Metropolis Dawn Ghorkov campaign. |
 | `md-taerkasten` | 15-level Metropolis Dawn Taerkasten campaign. |
+
+## Generator3 Single Level
+
+Remix one hand-made original level: its terrain, entity positions and balance
+numbers are reused, while faction identities, rosters and sky are regenerated
+from the chosen profile.
+
+```sh
+ualg gen3 single --seed 12345 --campaign-profile original --output out/L0101.ldf
+ualg gen3 single --seed 12345 --skeleton L1515 --output out/remix.ldf
+```
+
+| Option | Required | Default | Description |
+| --- | --- | --- | --- |
+| `--seed SEED` | No | `0` | Integer RNG seed. `0` uses the current time. |
+| `--campaign-profile {original,md-ghorkov,md-taerkasten}` | No | `original` | Roster/profile used for the remix. `original` draws from the vanilla corpus; the `md-*` profiles draw from Metropolis Dawn. |
+| `--skeleton NAME` | No | None | Force a specific source level, e.g. `L1515`. When omitted, a skeleton is chosen from the seed. |
+| `--level-id ID` | No | None | Use the original level with this id (e.g. `15` → `L1515`) as the skeleton. |
+| `--zero-enemy-radar-budgets` | No | Off | Set all enemy host station `rad_budget` values to `0`. |
+| `--zero-enemy-station-delays` | No | Off | Set all enemy host station `*_delay` values to `0`. |
+| `--output OUTPUT` | Yes | None | Output `.ldf` file path. Parent directories are created automatically. |
+
+## Generator3 Campaign
+
+Remix a full authored campaign. Each campaign slot reuses the matching original
+level as its skeleton, with gate progression rewired to the profile graph.
+
+```sh
+ualg gen3 campaign --seed 12345 --campaign-profile original --output-dir out/gen3
+```
+
+| Option | Required | Default | Description |
+| --- | --- | --- | --- |
+| `--seed SEED` | No | `0` | Integer RNG seed. `0` uses the current time. |
+| `--campaign-profile {original,md-ghorkov,md-taerkasten}` | No | `original` | Roster/profile used for the remix. |
+| `--zero-enemy-radar-budgets` | No | Off | Set all enemy host station `rad_budget` values to `0`. |
+| `--zero-enemy-station-delays` | No | Off | Set all enemy host station `*_delay` values to `0`. |
+| `--output-dir OUTPUT_DIR` | Yes | None | Directory where campaign `.ldf` files are written. The directory is created automatically. |
+
+Built-in profile sizes:
+
+| Profile | Output |
+| --- | --- |
+| `original` | 44-level vanilla campaign remix. |
+| `md-ghorkov` | 16-level Metropolis Dawn Ghorkov campaign remix. |
+| `md-taerkasten` | 15-level Metropolis Dawn Taerkasten campaign remix. |
 
 ## GUI Command
 

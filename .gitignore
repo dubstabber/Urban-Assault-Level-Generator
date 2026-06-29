@@ -42,4 +42,7 @@ Thumbs.db
 
 generator1/
 generator2/
+
+# Game-derived data (excluded like the raw levels it is built from)
 original-levels/
+src/ualg/data/gen3_corpus.json

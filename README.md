@@ -6,11 +6,13 @@ Implemented targets:
 
 - `generator1`: Random UA-derived terrain and campaign generator, defaulting to the improved recovered behavior.
 - `generator2`: PHP-derived.
+- `generator3`: Corpus-driven, authored-style generator (Remix mode). Instead of scattering terrain procedurally, it reuses a hand-made original level as a skeleton — its terrain maps, entity positions and balance numbers — and regenerates only the faction identities, rosters, sky and campaign wiring per seed.
 
 Compatibility policy:
 
 - `generator1` defaults to improved playable output. Use `--strict-parity` to disable the improved tileset filtering path where supported.
 - `generator2` follows the PHP legacy `SET_LIST` terrain allowlists instead of the broader shared tileset compatibility table.
+- `generator3` reads a dataset baked from the original levels. That dataset (`src/ualg/data/gen3_corpus.json`) is a local build artifact and is **not** committed, because it is derived from the gitignored `original-levels/` tree. It is built from those levels by `tools/build_gen3_corpus.py`, and Generator3 also auto-builds it on first use in a source checkout. The `original` profile draws from the vanilla corpus; the `md-*` profiles draw from Metropolis Dawn.
 
 ## Requirements
 
@@ -26,6 +28,8 @@ python -m ualg.cli gen1 single --seed 12345 --output out/L0101.ldf
 python -m ualg.cli gen1 campaign --seed 12345 --output-dir out/gen1
 python -m ualg.cli gen2 single --seed 12345 --level-id 1 --output out/L0101.ldf
 python -m ualg.cli gen2 campaign --seed 12345 --output-dir out/gen2
+python -m ualg.cli gen3 single --seed 12345 --skeleton L1515 --output out/remix.ldf
+python -m ualg.cli gen3 campaign --seed 12345 --output-dir out/gen3
 ```
 
 When installed as a package, the CLI command is `ualg`.
@@ -36,9 +40,9 @@ Full references:
 - [Backend API](docs/api.md)
 - [Backend architecture](docs/architecture.md)
 
-For both generators, add `--zero-enemy-radar-budgets` to set all enemy host station
-`rad_budget` values to `0`. For Generator2, add `--zero-enemy-station-delays` to
-set all enemy host station `*_delay` values to `0`.
+For all three generators, add `--zero-enemy-radar-budgets` to set all enemy host station
+`rad_budget` values to `0`. For Generator2 and Generator3, add `--zero-enemy-station-delays`
+to set all enemy host station `*_delay` values to `0`.
 
 Launch the GUI:
 

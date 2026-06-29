@@ -214,6 +214,76 @@ generate_campaign(
 
 Unknown campaign profiles raise `ValueError` and include the available choices.
 
+## Generator3
+
+`Generator3(profile_registry: ProfileRegistry | None = None)`
+
+Corpus-driven, authored-style generator. Phase 1 implements *Remix* mode: it
+reuses a hand-made original level as a skeleton (terrain maps, entity
+positions, balance numbers) and swaps only faction identities, rosters, sky and
+campaign wiring. The skeleton corpus is the baked
+`src/ualg/data/gen3_corpus.json`.
+
+### `generate_single`
+
+```python
+level = Generator3().generate_single(
+    seed=12345,
+    campaign_profile="original",
+    skeleton="L1515",
+)
+```
+
+Signature:
+
+```python
+generate_single(
+    seed: int = 0,
+    *,
+    campaign_profile: str = "original",
+    skeleton: str | None = None,
+    level_id: int | None = None,
+    zero_enemy_radar_budgets: bool = False,
+    zero_enemy_station_delays: bool = False,
+) -> GeneratedLevel
+```
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `seed` | `0` | Integer RNG seed. `0` uses the current time. |
+| `campaign_profile` | `"original"` | Roster/profile. `"original"` uses the vanilla corpus; `"md-ghorkov"`/`"md-taerkasten"` use Metropolis Dawn. |
+| `skeleton` | `None` | Force a source level by name, e.g. `"L1515"`. When omitted, a skeleton is chosen from the seed. |
+| `level_id` | `None` | Use the original level with this id (e.g. `15` → `L1515`) as the skeleton. |
+| `zero_enemy_radar_budgets` | `False` | Set all enemy host station `rad_budget` values to `0`. |
+| `zero_enemy_station_delays` | `False` | Set all enemy host station `*_delay` values to `0`. |
+
+The returned `GeneratedLevel.metadata` includes `"mode"`, `"skeleton"`,
+`"faction_remap"` and `"warnings"` (playability check results).
+
+### `generate_campaign`
+
+```python
+campaign = Generator3().generate_campaign(
+    seed=12345,
+    campaign_profile="original",
+)
+```
+
+Signature:
+
+```python
+generate_campaign(
+    seed: int = 0,
+    campaign_profile: str = "original",
+    *,
+    zero_enemy_radar_budgets: bool = False,
+    zero_enemy_station_delays: bool = False,
+) -> GeneratedCampaign
+```
+
+Each campaign slot reuses the matching original level as its skeleton, with
+gate progression rewired to the profile graph.
+
 ## Result Models
 
 ### `GeneratedLevel`
