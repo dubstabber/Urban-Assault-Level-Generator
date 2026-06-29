@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from ..constants import SKY_OPTIONS
+from ..ldf import canonicalize_gem_block
 from ..startup_scripts import startup_include_for_level
 from .context import _Gen3Level
 from .placement import (
@@ -139,7 +140,8 @@ class Generator3RemixBuilder:
         return copied
 
     def _remix_gem(self, level: _Gen3Level, gem: dict[str, Any]) -> list[str]:
-        return [self._remap_enable_owner(line, level.faction_remap) for line in gem["raw"]]
+        lines = [self._remap_enable_owner(line, level.faction_remap) for line in gem["raw"]]
+        return canonicalize_gem_block(lines)
 
     @staticmethod
     def _remap_enable_owner(line: str, faction_remap: dict[int, int]) -> str:

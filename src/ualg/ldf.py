@@ -51,6 +51,57 @@ class LDFWriter:
         return "".join(self._parts)
 
 
+def _head_without_comment(line: str) -> str:
+    stripped = line.split(";", 1)[0].strip().lower()
+    return stripped.split(None, 1)[0] if stripped else ""
+
+
+def canonicalize_gem_block(lines: list[str]) -> list[str]:
+    """Fix authored gem blocks where the gem-closing ``end`` precedes ``end_action``."""
+
+    result: list[str] = []
+    stack: list[str] = []
+    deferred_gem_ends: list[str] = []
+
+    for line in lines:
+        head = _head_without_comment(line)
+        if head == "begin_gem":
+            stack.append("gem")
+            result.append(line)
+        elif head == "begin_action":
+            stack.append("action")
+            result.append(line)
+        elif head.startswith("modify_"):
+            if stack and stack[-1] == "modify":
+                stack.pop()
+            stack.append("modify")
+            result.append(line)
+        elif head == "end":
+            if stack and stack[-1] == "modify":
+                stack.pop()
+                result.append(line)
+            elif stack and stack[-1] == "action":
+                deferred_gem_ends.append(line)
+            else:
+                if stack and stack[-1] == "gem":
+                    stack.pop()
+                result.append(line)
+                if deferred_gem_ends:
+                    deferred_gem_ends.pop(0)
+        elif head == "end_action":
+            if stack and stack[-1] == "action":
+                stack.pop()
+            result.append(line)
+        else:
+            result.append(line)
+
+    while deferred_gem_ends and stack and stack[-1] == "gem":
+        stack.pop()
+        result.append(deferred_gem_ends.pop(0))
+
+    return result
+
+
 def parse_maps(text: str) -> dict[str, tuple[int, int, MapRows]]:
     """Parse typ/own/hgt/blg map blocks from generated LDF text."""
 

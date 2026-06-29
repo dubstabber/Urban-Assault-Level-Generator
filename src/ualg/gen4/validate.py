@@ -318,26 +318,48 @@ def _validate_rendered_blocks(text: str) -> list[str]:
     problems: list[str] = []
     if set(parse_maps(text)) != {"typ_map", "own_map", "hgt_map", "blg_map"}:
         problems.append("rendered maps do not round-trip")
-    depth = 0
-    action_depth = 0
+    stack: list[str] = []
+    in_maps = False
     for line in text.replace("\r\n", "\n").split("\n"):
-        stripped = line.strip().lower()
-        head = stripped.split(None, 1)[0] if stripped else ""
-        if head == "begin_action":
-            action_depth += 1
+        head = _ldf_head(line)
+        if in_maps:
+            if head == "end":
+                in_maps = False
+            continue
+        if head == "begin_maps":
+            in_maps = True
+        elif head == "begin_action":
+            stack.append("action")
         elif head == "end_action":
-            action_depth -= 1
-        elif head.startswith("begin_") and head != "begin_maps":
-            depth += 1
+            if stack and stack[-1] == "action":
+                stack.pop()
+            else:
+                problems.append("gem action blocks are misnested")
+                if "action" in stack:
+                    while stack and stack[-1] != "action":
+                        stack.pop()
+                    stack.pop()
+        elif head.startswith("begin_"):
+            stack.append("block")
         elif head.startswith("modify_"):
-            depth += 1
-        elif head == "end" and depth:
-            depth -= 1
-    if action_depth != 0:
+            if stack and stack[-1] == "modify":
+                stack.pop()
+            stack.append("modify")
+        elif head == "end":
+            if stack and stack[-1] == "action":
+                problems.append("gem action block closed with end before end_action")
+            elif stack:
+                stack.pop()
+    if "action" in stack:
         problems.append("gem action blocks are unbalanced")
-    if depth != 0:
+    if stack:
         problems.append("rendered LDF blocks are unbalanced")
     return problems
+
+
+def _ldf_head(line: str) -> str:
+    stripped = line.split(";", 1)[0].strip().lower()
+    return stripped.split(None, 1)[0] if stripped else ""
 
 
 def _world_cell(pos_x: object, pos_z: object) -> tuple[int, int] | None:

@@ -28,6 +28,7 @@ from ..constants import (
     sector_to_world_z,
 )
 from ..core.maps import filled_rows
+from ..ldf import canonicalize_gem_block
 from ..models import MapRows
 from ..startup_scripts import startup_include_for_level
 from ..gen3.corpus import skeletons_for_source
@@ -722,7 +723,7 @@ class Generator4Builder:
             rewritten = _SEC_Y_RE.sub(rf"\g<1>{cell[1]}\2", rewritten)
             rewritten = self._remap_player_enable_owner(level, rewritten)
             lines.append(rewritten)
-        return lines
+        return canonicalize_gem_block(lines)
 
     def _remap_player_enable_owner(self, level: _Gen4Level, line: str) -> str:
         def replace(match: re.Match[str]) -> str:

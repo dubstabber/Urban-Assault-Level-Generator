@@ -22,7 +22,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..ldf import parse_maps
+from ..ldf import canonicalize_gem_block, parse_maps
 from ..models import MapRows
 
 # Keys in begin_level worth preserving when re-emitting a remixed header.
@@ -247,6 +247,7 @@ def parse_ldf(text: str, *, name: str = "", source: str = "") -> ParsedLevel:
             )
         elif head == "begin_gem":
             raw, end = _read_raw_block(lines, i)
+            raw = canonicalize_gem_block(raw)
             # Pull the simple scalar fields out of the verbatim body for placement.
             gem: dict[str, Any] = {"raw": raw}
             for line in raw[1:]:

@@ -25,8 +25,9 @@ from ualg.gen4.builder import Generator4Builder
 from ualg.gen4.infrastructure import station_info_by_building
 from ualg.gen4.passability import route_blockers
 from ualg.gen4.rules_builder import build_rules
+from ualg.gen4.validate import _validate_rendered_blocks
 from ualg.generator4 import Generator4
-from ualg.ldf import parse_maps
+from ualg.ldf import canonicalize_gem_block, parse_maps
 
 _SCOUT_VEHICLES = {9, 29, 35, 67, 74}
 
@@ -36,6 +37,11 @@ def _world_cell(entity: dict[str, object]) -> tuple[int, int]:
         round((int(entity["pos_x"]) - 1) / 1200 - 0.5),
         round((-(int(entity["pos_z"]) - 1)) / 1200 - 0.5),
     )
+
+
+def _ldf_head(line: str) -> str:
+    stripped = line.split(";", 1)[0].strip().lower()
+    return stripped.split(None, 1)[0] if stripped else ""
 
 
 def _station_cells(level) -> list[tuple[int, int, str, int]]:
@@ -135,6 +141,45 @@ class RulesTests(unittest.TestCase):
             with self.subTest(profile=profile, level_id=level_id):
                 record = next(r for r in rules["profiles"][profile]["levels"] if r["level_id"] == level_id)
                 self.assertEqual([(u["kind"], u["id"]) for u in record["new_unlocks"]], unlocks)
+
+    def test_known_malformed_building_unlock_gem_is_canonicalized(self) -> None:
+        rules = gen4_rules()
+        record = next(r for r in rules["profiles"]["md-ghorkov"]["levels"] if r["level_id"] == 19)
+        gem = next(
+            gem
+            for gem in record["upgrade_gems"]
+            if any(line.strip().startswith("modify_building 52") for line in gem["raw"])
+        )
+        heads = [_ldf_head(line) for line in gem["raw"] if _ldf_head(line)]
+
+        self.assertEqual(heads[-3:], ["end", "end_action", "end"])
+
+    def test_gem_canonicalizer_drops_duplicate_misplaced_end(self) -> None:
+        raw = [
+            "begin_gem",
+            "begin_action",
+            "modify_building 52",
+            "enable = 6",
+            "end",
+            "end",
+            "end_action",
+            "mb_status = unknown",
+            "end",
+        ]
+
+        self.assertEqual(
+            canonicalize_gem_block(raw),
+            [
+                "begin_gem",
+                "begin_action",
+                "modify_building 52",
+                "enable = 6",
+                "end",
+                "end_action",
+                "mb_status = unknown",
+                "end",
+            ],
+        )
 
     def test_station_building_categories_are_known(self) -> None:
         categories = {building: info.category for building, info in station_info_by_building().items()}
@@ -241,6 +286,31 @@ class GenerationTests(unittest.TestCase):
                 self.assertTrue(campaign.ok)
                 self.assertTrue(campaign.levels)
                 self.assertTrue(all(level.metadata["warnings"] == [] for level in campaign.levels))
+
+    def test_building_unlock_gem_closes_after_end_action(self) -> None:
+        level = self.generator.generate_single(seed=2026, campaign_profile="md-ghorkov", level_id=19)
+        lines = [line.strip() for line in level.text.replace("\r\n", "\n").split("\n")]
+        action_index = next(i for i, line in enumerate(lines) if line.startswith("modify_building 52"))
+        heads = [_ldf_head(line) for line in lines[action_index:action_index + 5] if _ldf_head(line)]
+
+        self.assertEqual(heads, ["modify_building", "enable", "end", "end_action", "end"])
+
+    def test_rendered_block_validator_rejects_gem_end_before_end_action(self) -> None:
+        problems = _validate_rendered_blocks(
+            "\n".join(
+                [
+                    "begin_gem",
+                    "begin_action",
+                    "modify_building 52",
+                    "enable = 6",
+                    "end",
+                    "end",
+                    "end_action",
+                ]
+            )
+        )
+
+        self.assertIn("gem action block closed with end before end_action", problems)
 
     def test_infrastructure_generated_for_station_archetypes(self) -> None:
         level = self.generator.generate_single(seed=2026, campaign_profile="original", level_id=15)
