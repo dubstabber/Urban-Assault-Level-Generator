@@ -303,6 +303,26 @@ class GenerationTests(unittest.TestCase):
         self.assertTrue(scout_distances)
         self.assertLessEqual(min(scout_distances), 5)
 
+    def test_host_cells_do_not_force_power_station_buildings(self) -> None:
+        level = self.generator.generate_single(seed=2026, campaign_profile="original", level_id=2)
+        parsed = parse_ldf(level.text)
+        info = station_info_by_building()
+
+        for robo in parsed.robos:
+            x, y = _world_cell(robo)
+            building = int(level.maps["blg"][y][x])
+            station = info.get(building)
+            self.assertFalse(station is not None and station.category == "power")
+            nearby_power = [
+                (px, py)
+                for py in range(max(1, y - 4), min(level.height - 1, y + 5))
+                for px in range(max(1, x - 4), min(level.width - 1, x + 5))
+                if (station_info := info.get(int(level.maps["blg"][py][px]))) is not None
+                and station_info.category == "power"
+                and max(abs(px - x), abs(py - y)) >= 2
+            ]
+            self.assertTrue(nearby_power)
+
     def test_hard_mode_reduces_player_territory_and_starting_stations(self) -> None:
         normal = self.generator.generate_single(seed=2026, campaign_profile="original", level_id=52)
         hard = self.generator.generate_single(seed=2026, campaign_profile="original", level_id=52, difficulty_mode="hard")

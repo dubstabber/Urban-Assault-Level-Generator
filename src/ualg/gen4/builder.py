@@ -34,7 +34,7 @@ from ..gen3.corpus import skeletons_for_source
 from ..gen3.synthesis import adjacency_model_for, border_tile, synthesize_typ_map
 from .context import _Gen4Level
 from .difficulty import EXTREMELY_HARD_MODE, HARD_MODE, NORMAL_MODE, is_extremely_hard, is_hard_or_harder
-from .infrastructure import station_counts, synthesize_infrastructure
+from .infrastructure import station_info_by_building, station_counts, synthesize_infrastructure
 from .passability import required_cells_connected, synthesize_hgt_map, terrain_metrics
 
 _FACTION_PLAYER = 1
@@ -480,11 +480,14 @@ class Generator4Builder:
         return rows
 
     def _apply_host_buildings(self, level: _Gen4Level, hosts: list[dict[str, Any]], typ: MapRows, blg: MapRows) -> None:
+        station_info = station_info_by_building()
         for host in hosts:
             buildings = level.profile.roster.buildings_by_faction.get(host["faction"], ())
             if not buildings:
                 continue
             building = int(buildings[0])
+            if station_info.get(building) is not None and station_info[building].category == "power":
+                continue
             x, y = host["x"], host["y"]
             blg[y][x] = building
             typ[y][x] = BUILDING_TYP_BY_ID.get(building, typ[y][x])
