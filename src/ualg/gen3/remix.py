@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from ..constants import SKY_OPTIONS
@@ -27,6 +28,8 @@ _BUDGET_KEYS = (
     "saf_budget", "saf_delay",
     "cpl_budget", "cpl_delay",
 )
+
+_ENABLE_OWNER_RE = re.compile(r"(\benable\s*=\s*)(-?\d+)", re.IGNORECASE)
 
 
 class Generator3RemixBuilder:
@@ -69,7 +72,7 @@ class Generator3RemixBuilder:
         level.squads = [self._remix_squad(level, squad) for squad in skeleton.record["squads"]]
         level.gates = [self._copy_gate(gate) for gate in skeleton.record["gates"]]
         level.items = [dict(item) for item in skeleton.record["items"]]
-        level.gems = [list(gem["raw"]) for gem in skeleton.record["gems"]]
+        level.gems = [self._remix_gem(level, gem) for gem in skeleton.record["gems"]]
         level.enables = self._build_enables(level)
         level.prototype = self._remix_prototype(level)
 
@@ -135,8 +138,23 @@ class Generator3RemixBuilder:
         copied["keysecs"] = [dict(key) for key in gate.get("keysecs", [])]
         return copied
 
+    def _remix_gem(self, level: _Gen3Level, gem: dict[str, Any]) -> list[str]:
+        return [self._remap_enable_owner(line, level.faction_remap) for line in gem["raw"]]
+
+    @staticmethod
+    def _remap_enable_owner(line: str, faction_remap: dict[int, int]) -> str:
+        def replace(match: re.Match[str]) -> str:
+            owner = int(match.group(2))
+            return f"{match.group(1)}{faction_remap.get(owner, owner)}"
+
+        return _ENABLE_OWNER_RE.sub(replace, line)
+
     def _build_enables(self, level: _Gen3Level) -> list[dict[str, Any]]:
-        present = [level.player_faction, *level.faction_remap.values()]
+        present = [
+            level.faction_remap.get(owner, owner)
+            for owner in level.skeleton.enemy_owners
+            if level.faction_remap.get(owner, owner) != level.player_faction
+        ]
         return build_enables(level.profile.roster, present, profile_id=level.profile_id)
 
     def _remix_prototype(self, level: _Gen3Level) -> list[str]:

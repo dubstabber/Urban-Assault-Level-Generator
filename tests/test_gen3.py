@@ -205,6 +205,36 @@ class RemixTests(unittest.TestCase):
         for owner in skeleton.enemy_owners:
             self.assertIn(remap[owner], enemy_pool)
 
+    def test_remix_single_does_not_emit_player_enable(self) -> None:
+        skeletons = {
+            "original": "L0101",
+            "md-ghorkov": "L0707",
+            "md-taerkasten": "L0606",
+        }
+        for profile, skeleton in skeletons.items():
+            with self.subTest(profile=profile):
+                level = self.generator.generate_single(seed=7, campaign_profile=profile, skeleton=skeleton)
+                player = int(self.generator.profiles.get(profile).player_faction)
+                owners = _enable_owners(level.text)
+
+                self.assertNotIn(player, owners)
+                self.assertTrue(owners)
+
+    def test_remix_campaigns_do_not_emit_player_enable(self) -> None:
+        for profile in ("original", "md-ghorkov", "md-taerkasten"):
+            campaign = self.generator.generate_campaign(seed=2026, campaign_profile=profile)
+            player = int(self.generator.profiles.get(profile).player_faction)
+            for level in campaign.levels:
+                with self.subTest(profile=profile, level_id=level.level_id):
+                    self.assertNotIn(player, _enable_owners(level.text))
+
+    def test_remix_tech_gem_enable_owner_remapped_to_player_faction(self) -> None:
+        level = self.generator.generate_single(seed=1, campaign_profile="md-ghorkov", skeleton="L0202")
+        joined = level.text.replace("\r\n", "\n")
+
+        self.assertRegex(joined, r"\benable\s*=\s*6\b")
+        self.assertNotRegex(joined, r"\benable\s*=\s*1\b")
+
     def test_output_crlf_and_maps_roundtrip(self) -> None:
         level = self.generator.generate_single(seed=42, campaign_profile="original", skeleton="L0101")
         self.assertIn("\r\n", level.text)
@@ -286,6 +316,16 @@ class SynthesisTests(unittest.TestCase):
         self.assertGreaterEqual(joined.count("begin_robo"), 2)
         self.assertIn("owner\t=\t1", joined)  # player faction host present
 
+    def test_synthesis_single_does_not_emit_player_enable(self) -> None:
+        for profile in ("original", "md-ghorkov", "md-taerkasten"):
+            with self.subTest(profile=profile):
+                level = self.generator.generate_single(seed=3, campaign_profile=profile, mode="synthesis")
+                player = int(self.generator.profiles.get(profile).player_faction)
+                owners = _enable_owners(level.text)
+
+                self.assertNotIn(player, owners)
+                self.assertTrue(owners)
+
     def test_synthesis_maps_well_formed(self) -> None:
         level = self.generator.generate_single(seed=9, campaign_profile="original", mode="synthesis")
         parsed = parse_maps(level.text)
@@ -296,10 +336,12 @@ class SynthesisTests(unittest.TestCase):
 
     def test_synthesis_campaign_valid(self) -> None:
         campaign = self.generator.generate_campaign(seed=5, campaign_profile="md-ghorkov", mode="synthesis")
+        player = int(self.generator.profiles.get("md-ghorkov").player_faction)
         self.assertTrue(campaign.ok)
         self.assertTrue(campaign.levels)
         for level in campaign.levels:
             self.assertEqual(level.metadata["warnings"], [])
+            self.assertNotIn(player, _enable_owners(level.text))
 
     def test_unknown_mode_rejected(self) -> None:
         with self.assertRaises(ValueError):
@@ -342,6 +384,10 @@ class EnableExclusionTests(unittest.TestCase):
         self.assertFalse(
             set(BLACK_SECT_ENABLE_EXCLUDED_BUILDING_IDS) & set(enables[_FACTION_BLACK_SECT]["buildings"])
         )
+
+
+def _enable_owners(text: str) -> list[int]:
+    return [int(enable["owner"]) for enable in parse_ldf(text).enables]
 
 
 if __name__ == "__main__":
