@@ -1,9 +1,9 @@
 """Build the Generator3 skeleton corpus from the raw ``original-levels/`` tree.
 
-The baked ``gen3_corpus.json`` is *not* committed (it is derived from the
-game's original level files, which are themselves gitignored). Instead it is a
-local build artifact: ``tools/build_gen3_corpus.py`` writes it explicitly, and
-:func:`ualg.gen3.corpus` auto-builds it on demand in a source checkout.
+The baked ``gen3_corpus.json`` is committed so Generator3 can run from an
+installed package without the raw levels. ``tools/build_gen3_corpus.py``
+refreshes it explicitly, and :func:`ualg.gen3.corpus` can still auto-build it
+on demand in a source checkout if the baked file is missing.
 """
 
 from __future__ import annotations

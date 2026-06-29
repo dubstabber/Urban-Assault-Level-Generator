@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Bake the hand-made original levels into ``src/ualg/data/gen3_corpus.json``.
 
-This file is a local build artifact (gitignored) because it is derived from the
-game's original levels. Generator3 also auto-builds it on demand in a source
-checkout, so running this script is only needed to refresh the cache explicitly.
+This file is committed so Generator3 can run from an installed package without
+the raw levels. Generator3 also auto-builds it on demand in a source checkout
+if the baked file is missing, so running this script is only needed to refresh
+the corpus explicitly.
 
 Run from anywhere::
 

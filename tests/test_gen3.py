@@ -12,6 +12,7 @@ from ualg.constants import (
     ENABLE_EXCLUDED_VEHICLE_IDS,
     MD_TAERKASTEN_ENABLE_EXCLUDED_VEHICLE_IDS,
 )
+from ualg.data import gen3_corpus
 from ualg.gen3.corpus import skeleton_by_name, skeletons_for_source
 from ualg.gen3.ldf_reader import parse_ldf
 from ualg.gen3.placement import build_enables
@@ -156,6 +157,12 @@ class LdfReaderTests(unittest.TestCase):
 
 
 class CorpusTests(unittest.TestCase):
+    def test_baked_corpus_resource_available(self) -> None:
+        corpus = gen3_corpus()
+
+        self.assertEqual(corpus["version"], 1)
+        self.assertEqual(len(corpus["skeletons"]), 75)
+
     def test_both_sources_present(self) -> None:
         self.assertEqual(len(skeletons_for_source("vanilla")), 44)
         self.assertEqual(len(skeletons_for_source("metropolisDawn")), 31)

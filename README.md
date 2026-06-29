@@ -12,7 +12,7 @@ Compatibility policy:
 
 - `generator1` defaults to improved playable output. Use `--strict-parity` to disable the improved tileset filtering path where supported.
 - `generator2` follows the PHP legacy `SET_LIST` terrain allowlists instead of the broader shared tileset compatibility table.
-- `generator3` reads a dataset baked from the original levels. That dataset (`src/ualg/data/gen3_corpus.json`) is a local build artifact and is **not** committed, because it is derived from the gitignored `original-levels/` tree. It is built from those levels by `tools/build_gen3_corpus.py`, and Generator3 also auto-builds it on first use in a source checkout. The `original` profile draws from the vanilla corpus; the `md-*` profiles draw from Metropolis Dawn.
+- `generator3` reads a dataset baked from the original levels, committed at `src/ualg/data/gen3_corpus.json`. It is regenerated from the (gitignored) `original-levels/` tree by `tools/build_gen3_corpus.py`, and Generator3 also auto-builds it on first use if the file is missing and the raw levels are present. The `original` profile draws from the vanilla corpus; the `md-*` profiles draw from Metropolis Dawn.
 
 ## Requirements
 

@@ -224,7 +224,8 @@ Corpus-driven, authored-style generator with two modes. **Remix**
 identities, rosters, sky and campaign wiring. **Synthesis**
 (`mode="synthesis"`) learns tile-adjacency from the corpus and uses Wave
 Function Collapse to generate new coherent terrain, then places fresh entities
-on it. The skeleton corpus is the locally built `src/ualg/data/gen3_corpus.json`.
+on it. The skeleton corpus is committed package data at
+`src/ualg/data/gen3_corpus.json`.
 
 ### `generate_single`
 
